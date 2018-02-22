@@ -3,7 +3,7 @@ use, intrinsic :: iso_fortran_env, only: output_unit
 use KindModule
 public
 ! -- modflow 6 version
-character(len=40), parameter :: VERSION = 'mf6.0.1 Sep 28, 2017'
+character(len=40), parameter :: VERSION = 'mf6.0.2 February 23, 2018'
 character(len=10), parameter :: MFVNAM = ' 6'
 character(len=*), parameter  :: MFTITLE =                                    &
 'U.S. GEOLOGICAL SURVEY MODULAR HYDROLOGIC MODEL'

@@ -75,8 +75,8 @@ module BaseDisModule
     procedure :: get_cell_volume
     procedure :: write_grb
     !
-    procedure, private :: read_int_array
-    procedure, private :: read_dbl_array
+    procedure          :: read_int_array
+    procedure          :: read_dbl_array
     generic, public    :: read_grid_array => read_int_array, read_dbl_array
     procedure, public  :: read_layer_array
     procedure, public  :: read_list
@@ -208,7 +208,7 @@ module BaseDisModule
       endif
     enddo
     !
-    call this%write_grb(ict)
+    if (this%writegrb) call this%write_grb(ict)
     !
     ! -- Return
     return
