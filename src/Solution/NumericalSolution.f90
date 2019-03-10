@@ -4,9 +4,10 @@ module NumericalSolutionModule
   use KindModule,              only: DP, I4B
   use TimerModule,             only: code_timer
   use ConstantsModule,         only: LINELENGTH, LENSOLUTIONNAME,              &
-                                     DZERO, DEM20, DEM15, DEM6, DEM4,          &
-                                     DEM3, DEM2, DEM1, DHALF,                  &
+                                     DPREC, DZERO, DEM20, DEM15, DEM6,         &
+                                     DEM4, DEM3, DEM2, DEM1, DHALF,            &
                                      DONE, DTHREE, DEP6, DEP20
+  use GenericUtilities,        only: IS_SAME
   use VersionModule,           only: IDEVELOPMODE
   use BaseModelModule,         only: BaseModelType
   use BaseSolutionModule,      only: BaseSolutionType, AddBaseSolutionToList
@@ -37,16 +38,17 @@ module NumericalSolutionModule
     real(DP), pointer                                    :: ttsoln
     integer(I4B), pointer                                :: neq => NULL()
     integer(I4B), pointer                                :: nja => NULL()
-    integer(I4B), pointer, dimension(:), contiguous      :: ia => NULL()
-    integer(I4B), pointer, dimension(:), contiguous      :: ja => NULL()
-    real(DP), pointer, dimension(:), contiguous          :: amat => NULL()
-    real(DP), pointer, dimension(:), contiguous          :: rhs => NULL()
-    real(DP), pointer, dimension(:), contiguous          :: x => NULL()
-    integer(I4B), pointer, dimension(:), contiguous      :: active => NULL()
-    real(DP), pointer, dimension(:), contiguous          :: xtemp => NULL()
+    integer(I4B), dimension(:), pointer, contiguous      :: ia => NULL()
+    integer(I4B), dimension(:), pointer, contiguous      :: ja => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: amat => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: rhs => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: x => NULL()
+    integer(I4B), dimension(:), pointer, contiguous      :: active => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: xtemp => NULL()
     type(BlockParserType) :: parser
     !
-    !sparse matrix data
+    ! -- sparse matrix data
+    real(DP), pointer                                    :: rclosebnd => NULL()
     real(DP), pointer                                    :: theta => NULL()
     real(DP), pointer                                    :: akappa => NULL()
     real(DP), pointer                                    :: gamma => NULL()
@@ -70,29 +72,31 @@ module NumericalSolutionModule
     integer(I4B), pointer                                :: numtrack => NULL()
     integer(I4B), pointer                                :: iprims => NULL()
     integer(I4B), pointer                                :: ibflag => NULL()
-    integer(I4B), dimension(:,:), pointer                :: lrch => NULL()
-    real(DP), dimension(:), pointer                      :: hncg => NULL()
-    real(DP), dimension(:), pointer                      :: dxold => NULL()
-    real(DP), dimension(:), pointer                      :: deold => NULL()
-    real(DP), dimension(:), pointer                      :: wsave => NULL()
-    real(DP), dimension(:), pointer                      :: hchold => NULL()
-    ! summary
-    character(len=31), pointer, dimension(:)             :: caccel => NULL()
+    integer(I4B), dimension(:,:), pointer, contiguous    :: lrch => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: hncg => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: dxold => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: deold => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: wsave => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: hchold => NULL()
+    !
+    ! -- convergence summary information
+    character(len=31), dimension(:), pointer, contiguous :: caccel => NULL()
     integer(I4B), pointer                                :: icsvout => NULL()
     integer(I4B), pointer                                :: nitermax => NULL()
     integer(I4B), pointer                                :: nitercnt => NULL()
     integer(I4B), pointer                                :: convnmod => NULL()
-    integer(I4B), pointer, dimension(:), contiguous      :: convmodstart => NULL()
-    integer(I4B), pointer, dimension(:), contiguous      :: locdv => NULL()
-    integer(I4B), pointer, dimension(:), contiguous      :: locdr => NULL()
-    integer(I4B), pointer, dimension(:), contiguous      :: itinner => NULL()
+    integer(I4B), dimension(:), pointer, contiguous      :: convmodstart => NULL()
+    integer(I4B), dimension(:), pointer, contiguous      :: locdv => NULL()
+    integer(I4B), dimension(:), pointer, contiguous      :: locdr => NULL()
+    integer(I4B), dimension(:), pointer, contiguous      :: itinner => NULL()
     integer(I4B), pointer, dimension(:,:), contiguous    :: convlocdv => NULL()
     integer(I4B), pointer, dimension(:,:), contiguous    :: convlocdr => NULL()
-    real(DP), pointer, dimension(:), contiguous          :: dvmax => NULL()
-    real(DP), pointer, dimension(:), contiguous          :: drmax => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: dvmax => NULL()
+    real(DP), dimension(:), pointer, contiguous          :: drmax => NULL()
     real(DP), pointer, dimension(:,:), contiguous        :: convdvmax => NULL()
     real(DP), pointer, dimension(:,:), contiguous        :: convdrmax => NULL()
-    ! ptc
+    !
+    ! -- pseudo-transient continuation
     integer(I4B), pointer                                :: iallowptc => NULL()
     integer(I4B), pointer                                :: iptcopt => NULL()
     integer(I4B), pointer                                :: iptcout => NULL()
@@ -104,10 +108,10 @@ module NumericalSolutionModule
     real(DP), pointer                                    :: ptcthresh => NULL()
     real(DP), pointer                                    :: ptcrat => NULL()
     !
-    ! linear accelerator storage
+    ! -- linear accelerator storage
     type(IMSLINEAR_DATA), POINTER                        :: imslinear => NULL()
     !
-    ! sparse object
+    ! -- sparse object
     type(sparsematrix)                                   :: sparse
 
   contains
@@ -234,6 +238,7 @@ contains
     call mem_allocate (this%linmeth, 'LINMETH', solutionname)
     call mem_allocate (this%nonmeth, 'NONMETH', solutionname)
     call mem_allocate (this%iprims, 'IPRIMS', solutionname)
+    call mem_allocate (this%rclosebnd, 'RCLOSEBND', solutionname)
     call mem_allocate (this%theta, 'THETA', solutionname)
     call mem_allocate (this%akappa, 'AKAPPA', solutionname)
     call mem_allocate (this%gamma, 'GAMMA', solutionname)
@@ -278,6 +283,7 @@ contains
     this%linmeth = 1
     this%nonmeth = 0
     this%iprims = 0
+    this%rclosebnd = DZERO
     this%theta = DZERO
     this%akappa = DZERO
     this%gamma = DZERO
@@ -349,9 +355,11 @@ contains
     call mem_allocate(this%convdvmax, this%convnmod, 0, 'CONVDVMAX', this%name)
     call mem_allocate(this%convdrmax, this%convnmod, 0, 'CONVDRMAX', this%name)
     !
-    ! -- initialize
+    ! -- initialize allocated arrays
     do i = 1, this%neq
       this%x(i) = DZERO
+      this%xtemp(i) = DZERO
+      this%dxold(i) = DZERO
       this%active(i) = 1 !default is active
     enddo
     !
@@ -452,6 +460,7 @@ contains
     logical :: isfound, endOfBlock
     integer(I4B) :: ival
     real(DP) :: rval
+    real(DP) :: rclose
     character(len=*),parameter :: fmtcsvout = &
       "(4x, 'CSV OUTPUT WILL BE SAVED TO FILE: ', a, /4x, 'OPENED ON UNIT: ', I7)"
     character(len=*),parameter :: fmtptcout = &
@@ -526,6 +535,10 @@ contains
               'KEYWORD MUST BE FOLLOWED BY FILEOUT'
             call store_error(errmsg)
           end if
+        case ('NO_PTC')
+          call this%parser%DevOpt()
+          this%iallowptc = 0
+          write(IOUT,'(1x,A)') 'PSEUDO-TRANSIENT CONTINUATION DISABLED'
         !
         ! -- right now these are options that are only available in the
         !    development version and are not included in the documentation.
@@ -535,10 +548,6 @@ contains
           call this%parser%DevOpt()
           this%iallowptc = 1
           write(IOUT,'(1x,A)') 'PSEUDO-TRANSIENT CONTINUATION ENABLED'
-        case ('DEV_NO_PTC')
-          call this%parser%DevOpt()
-          this%iallowptc = 0
-          write(IOUT,'(1x,A)') 'PSEUDO-TRANSIENT CONTINUATION DISABLED'
         case('DEV_PTC_OUTPUT')
           call this%parser%DevOpt()
           this%iallowptc = 1
@@ -637,6 +646,8 @@ contains
           this%hclose  = this%parser%GetDouble()
         case ('OUTER_MAXIMUM')
           this%mxiter  = this%parser%GetInteger()
+        case ('OUTER_RCLOSEBND')
+          this%rclosebnd  = this%parser%GetDouble()
         case ('UNDER_RELAXATION')
           call this%parser%GetStringCaps(keyword)
           ival = 0
@@ -695,48 +706,32 @@ contains
       end if
     end if
     !
-    IF ( THIS%THETA.LT.DEM3 ) this%theta = DEM3
+    IF ( THIS%THETA < DEM3 ) this%theta = DEM3
     !
     ! -- backtracking should only be used if this%nonmeth > 0
     if (this%nonmeth < 1) then
       this%ibflag = 0
     end if
     !
-    !-------ECHO INPUT OF NONLINEAR ITERATION PARAMETERS AND LINEAR SOLVER INDEX
-    WRITE(IOUT,9002) this%hclose,this%mxiter,this%iprims,this%nonmeth,this%linmeth
-    !
-9002 FORMAT(1X,'OUTER ITERATION CONVERGENCE CRITERION     (HCLOSE) = ', E15.6, &
-    &      /1X,'MAXIMUM NUMBER OF OUTER ITERATIONS        (MXITER) = ', I9,    &
-    &      /1X,'SOLVER PRINTOUT INDEX                     (IPRIMS) = ',I9,     &
-    &      /1X,'NONLINEAR ITERATION METHOD            (NONLINMETH) = ',I9,     &
-    &      /1X,'LINEAR SOLUTION METHOD                   (LINMETH) = ',I9)
-    !
-    IF(THIS%NONMETH.NE.0)THEN
-      WRITE(IOUT,9003) this%theta, this%akappa, this%gamma, this%amomentum,    &
-                       this%numtrack
-      IF(THIS%NUMTRACK.NE.0) WRITE(IOUT,9004) this%btol,this%breduc,this%res_lim
-    ENDIF
-
-9003 FORMAT(1X,'UNDER-RELAXATION WEIGHT REDUCTION FACTOR   (THETA) = ', E15.6, &
-    &      /1X,'UNDER-RELAXATION WEIGHT INCREASE INCREMENT (KAPPA) = ', E15.6, &
-    &      /1X,'UNDER-RELAXATION PREVIOUS HISTORY FACTOR   (GAMMA) = ', E15.6, &
-    &      /1X,'UNDER-RELAXATIONMOMENTUM TERM          (AMOMENTUM) = ', E15.6, &
-    &      /1X,'   MAXIMUM NUMBER OF BACKTRACKS         (NUMTRACK) = ',I9)
-9004 FORMAT(1X,'BACKTRACKING TOLERANCE FACTOR               (BTOL) = ', E15.6, &
-    &      /1X,'BACKTRACKING REDUCTION FACTOR             (BREDUC) = ', E15.6, &
-    &      /1X,'BACKTRACKING RESIDUAL LIMIT              (RES_LIM) = ', E15.6)
-
-    if(this%mxiter.le.0) then
+    ! -- check that MXITER is greater than zero
+    if (this%mxiter <= 0) then
       write (errmsg,'(a)') 'IMS sln_ar: OUTER ITERATION NUMBER MUST BE > 0.'
       call store_error(errmsg)
     END IF
-
+    !
+    ! -- check that RCLOSEBND is greater than zero
+    IF (this%rclosebnd <=  DZERO) THEN
+      WRITE( errmsg,'(A)' ) 'SLN_AR: OUTER_RCLOSEBND MUST > 0.0. '
+      call store_error(errmsg)
+    END IF
+    !
+    !
     isymflg = 1
-    if ( this%nonmeth.gt.0 )then
+    if ( this%nonmeth > 0 )then
       WRITE(IOUT,*) '**UNDER-RELAXATION WILL BE USED***'
       WRITE(IOUT,*)
       isymflg = 0
-    elseif ( this%nonmeth.eq.0 )then
+    elseif ( this%nonmeth == 0 )then
       WRITE(IOUT,*) '***UNDER-RELAXATION WILL NOT BE USED***'
       WRITE(IOUT,*)
     ELSE
@@ -746,7 +741,7 @@ contains
     END IF
     ! call secondary subroutine to initialize and read linear solver parameters
     ! IMSLINEAR solver
-    if ( this%linmeth==1 )then
+    if ( this%linmeth == 1 )then
       allocate(this%imslinear)
       WRITE(IOUT,*) '***IMS LINEAR SOLVER WILL BE USED***'
       call this%imslinear%imslinear_allocate(this%name, this%iu, IOUT,         &
@@ -764,7 +759,6 @@ contains
         &                'METHOD SPECIFIED. CHECK INPUT.***'
       call store_error(errmsg)
     END IF
-
     !
     ! -- If CG, then go through each model and each exchange and check
     !    for asymmetry
@@ -789,6 +783,41 @@ contains
       enddo
       !
     endif
+    !
+    ! -- write solver data to output file
+    !
+    ! -- non-linear solver data
+    WRITE(IOUT,9002) this%hclose, this%rclosebnd, this%mxiter,                 &
+                     this%iprims, this%nonmeth, this%linmeth
+    !
+    ! -- standard outer iteration formats
+9002 FORMAT(1X,'OUTER ITERATION CONVERGENCE CRITERION     (HCLOSE) = ', E15.6, &
+    &      /1X,'OUTER ITERATION BOUNDARY FLOW RESIDUAL (RCLOSEBND) = ', E15.6, &
+    &      /1X,'MAXIMUM NUMBER OF OUTER ITERATIONS        (MXITER) = ', I9,    &
+    &      /1X,'SOLVER PRINTOUT INDEX                     (IPRIMS) = ', I9,    &
+    &      /1X,'NONLINEAR ITERATION METHOD            (NONLINMETH) = ', I9,    &
+    &      /1X,'LINEAR SOLUTION METHOD                   (LINMETH) = ', I9)
+    !
+    IF(this%nonmeth /= 0)THEN
+      WRITE(IOUT,9003) this%theta, this%akappa, this%gamma, this%amomentum,    &
+                       this%numtrack
+      IF(this%numtrack /= 0) WRITE(IOUT,9004) this%btol,this%breduc,this%res_lim
+    END IF
+    !
+    ! -- under-relaxation formats
+9003 FORMAT(1X,'UNDER-RELAXATION WEIGHT REDUCTION FACTOR   (THETA) = ', E15.6, &
+    &      /1X,'UNDER-RELAXATION WEIGHT INCREASE INCREMENT (KAPPA) = ', E15.6, &
+    &      /1X,'UNDER-RELAXATION PREVIOUS HISTORY FACTOR   (GAMMA) = ', E15.6, &
+    &      /1X,'UNDER-RELAXATIONMOMENTUM TERM          (AMOMENTUM) = ', E15.6, &
+    &      /1X,'   MAXIMUM NUMBER OF BACKTRACKS         (NUMTRACK) = ',I9)
+    !
+    ! -- backtracking formats
+9004 FORMAT(1X,'BACKTRACKING TOLERANCE FACTOR               (BTOL) = ', E15.6, &
+    &      /1X,'BACKTRACKING REDUCTION FACTOR             (BREDUC) = ', E15.6, &
+    &      /1X,'BACKTRACKING RESIDUAL LIMIT              (RES_LIM) = ', E15.6)
+    !
+    ! -- linear solver data
+    call this%imslinear%imslinear_summary(this%mxiter)
 
     ! -- write summary of solver error messages
     ierr = count_errors()
@@ -989,6 +1018,7 @@ contains
     call mem_deallocate(this%linmeth)
     call mem_deallocate(this%nonmeth)
     call mem_deallocate(this%iprims)
+    call mem_deallocate(this%rclosebnd)
     call mem_deallocate(this%theta)
     call mem_deallocate(this%akappa)
     call mem_deallocate(this%gamma)
@@ -1155,7 +1185,7 @@ contains
             trim(adjustl(mp%name)), '") DURING THIS TIME STEP'
         end if
       enddo
-      
+
       !
       ! -- Nonlinear iteration loop for this solution
       this%icnvg = 0
@@ -1284,7 +1314,7 @@ contains
           end if
           do im=1,this%modellist%Count()
             mp => GetNumericalModelFromList(this%modellist, im)
-            call mp%model_cc(kiter, iend, this%icnvg)
+            call mp%model_cc(kiter, iend, this%icnvg, this%hclose, this%rclosebnd)
           enddo
         end if
         !
@@ -1303,7 +1333,7 @@ contains
         end if
         !
         ! -- dampening
-        if (this%icnvg /= 1) then 
+        if (this%icnvg /= 1) then
           if (this%nonmeth > 0) then
             call this%sln_underrelax(kiter, this%hncg(kiter), this%neq,        &
                                      this%active, this%x, this%xtemp)
@@ -1848,8 +1878,9 @@ contains
     integer(I4B), intent(inout) :: iptc
     real(DP), intent(in) :: ptcf
     ! -- local
+    logical :: lsame
     integer(I4B) :: n
-    integer(I4B) :: itestmat,i,i1,i2
+    integer(I4B) :: itestmat, i, i1, i2
     integer(I4B) :: iptct
     real(DP) :: adiag, diagval
     real(DP) :: l2norm
@@ -1898,6 +1929,11 @@ contains
             iptc = 0
           end if
         end if
+      else
+        lsame = IS_SAME(l2norm, this%l2norm0)
+        if (lsame) then
+          iptc = 0
+        end if
       end if
     end if
     iptct = iptc * this%iallowptc
@@ -1913,7 +1949,9 @@ contains
           this%ptcdel = this%ptcdel0
         else
           if (this%iptcopt == 0) then
-            this%ptcdel = done / ptcf
+            !
+            ! -- ptcf is the reciprocal of the pseudo-time step
+            this%ptcdel = DONE / ptcf
           else
             bnorm = DZERO
             do n = 1, this%neq
@@ -1933,9 +1971,9 @@ contains
         end if
       end if
       if (this%ptcdel > DZERO) then
-        ptcval = done / this%ptcdel
+        ptcval = DONE / this%ptcdel
       else
-        ptcval = done
+        ptcval = DONE
       end if
       diagmin = DEP20
       bnorm = DZERO
@@ -2021,6 +2059,7 @@ contains
       this%hclose = dem3
       this%mxiter = 25
       this%nonmeth = 0
+      this%rclosebnd = DEM1
       this%theta = 1.0
       this%akappa = DZERO
       this%gamma = DZERO
@@ -2035,6 +2074,7 @@ contains
       this%hclose = dem2
       this%mxiter = 50
       this%nonmeth = 3
+      this%rclosebnd = DEM1
       this%theta = 0.9d0
       this%akappa = 0.0001d0
       this%gamma = DZERO
@@ -2049,6 +2089,7 @@ contains
       this%hclose = dem1
       this%mxiter = 100
       this%nonmeth = 3
+      this%rclosebnd = DEM1
       this%theta = 0.8d0
       this%akappa = 0.0001d0
       this%gamma = DZERO
@@ -2286,7 +2327,7 @@ contains
     ! -- return
     return
   end subroutine sln_l2norm
-  
+
   subroutine sln_maxval(this, neq, v, vnorm)
 ! ******************************************************************************
 ! sln_l2norm
@@ -2302,11 +2343,20 @@ contains
     ! -- local
     integer(I4B) :: n
     real(DP) :: d
-! ------------------------------------------------------------------------------ 
-    vnorm = DZERO
-    do n = 1, neq
+    real(DP) :: denom
+    real(DP) :: dnorm
+! ------------------------------------------------------------------------------
+    vnorm = v(1)
+    do n = 2, neq
       d = v(n)
-      if (abs(d) > vnorm) then
+      denom = abs(vnorm)
+      if (denom == DZERO) then
+        denom = DPREC
+      end if
+      !
+      ! -- calculate normalized value
+      dnorm = abs(d) / denom
+      if (dnorm > DONE) then
         vnorm = d
       end if
     end do
@@ -2314,7 +2364,7 @@ contains
     ! -- return
     return
   end subroutine sln_maxval
-  
+
   subroutine sln_calcdx(this, neq, active, x, xtemp, dx)
 ! ******************************************************************************
 ! sln_l2norm
@@ -2331,7 +2381,7 @@ contains
     real(DP), dimension(neq), intent(inout) :: dx
     ! -- local
     integer(I4B) :: n
-! ------------------------------------------------------------------------------ 
+! ------------------------------------------------------------------------------
     do n = 1, neq
       ! -- skip inactive nodes
       if (active(n) < 1) then
@@ -2344,7 +2394,7 @@ contains
     ! -- return
     return
   end subroutine sln_calcdx
-  
+
 
   subroutine sln_underrelax(this, kiter, bigch, neq, active, x, xtemp)
 ! ******************************************************************************
@@ -2384,29 +2434,29 @@ contains
     else if (this%nonmeth == 2) then
       if (kiter == 1) then
         relax = done
-        this%relaxold = done
+        this%relaxold = DONE
         this%bigch = bigch
         this%bigchold = bigch
       else
         ! -- compute relaxation factor
         es = this%bigch / (this%bigchold * this%relaxold)
         aes = abs(es)
-        if (es.lt.-done) then
+        if (es < -DONE) then
           relax = dhalf / aes
         else
-          relax = (dthree + es) / (dthree + aes)
+          relax = (DTHREE + es) / (DTHREE + aes)
         end if
       end if
       this%relaxold = relax
       !
       ! -- modify cooley to use exponential average of past changes
-      this%bigchold = (done - this%gamma) * this%bigch  + this%gamma *         &
+      this%bigchold = (DONE - this%gamma) * this%bigch  + this%gamma *         &
                       this%bigchold
       ! -- this method does it right after newton - need to do it after
       !    underrelaxation and backtracking.
       !
       ! -- compute new head after under-relaxation
-      if (relax.lt.done) then
+      if (relax < DONE) then
         do n = 1, neq
           if (active(n) < 1) cycle
           delx = x(n) - xtemp(n)
@@ -2424,7 +2474,7 @@ contains
         ! -- compute step-size (delta x) and initialize d-b-d parameters
         delx = x(n) - xtemp(n)
 
-        if ( kiter.eq.1 ) then
+        if ( kiter == 1 ) then
           this%wsave(n) = DONE
           this%hchold(n) = DEM20
           this%deold(n) = DZERO
@@ -2440,7 +2490,7 @@ contains
         else
           ww = this%wsave(n) + this%akappa
         end if
-        if ( ww.gt.done ) ww = done
+        if ( ww > DONE ) ww = DONE
         this%wsave(n) = ww
 
         ! -- compute exponential average of past changes in hchold
@@ -2459,7 +2509,7 @@ contains
         !
         ! -- compute accepted step-size and new head
         amom = DZERO
-        if (kiter.gt.4) amom = this%amomentum
+        if (kiter > 4) amom = this%amomentum
         delx = delx * ww + amom * this%hchold(n)
         x(n) = xtemp(n) + delx
       end do
@@ -2585,6 +2635,3 @@ contains
   end subroutine sln_get_nodeu
 
 end module NumericalSolutionModule
-
-
-

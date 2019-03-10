@@ -18,8 +18,8 @@ module OutputControlData
     integer(I4B), pointer                   :: nwidthp  => null()
     real(DP), pointer                       :: dnodata  => null()
     integer(I4B), pointer                   :: inodata  => null()
-    real(DP), dimension(:), pointer         :: dblvec   => null()
-    integer(I4B), dimension(:), pointer     :: intvec   => null()
+    real(DP), dimension(:), pointer, contiguous         :: dblvec   => null()
+    integer(I4B), dimension(:), pointer, contiguous     :: intvec   => null()
     class(DisBaseType), pointer             :: dis      => null()
     type(PrintSaveManagerType), pointer     :: psmobj   => null()
   contains
@@ -95,7 +95,7 @@ module OutputControlData
     return
   end subroutine ocd_rp_check
 
-  subroutine ocd_ot(this, ipflg, kstp, nstp, iout)
+  subroutine ocd_ot(this, ipflg, kstp, nstp, iout, iprint_opt, isav_opt)
 ! ******************************************************************************
 ! ocd_ot -- record information
 ! ******************************************************************************
@@ -108,18 +108,40 @@ module OutputControlData
     integer(I4B), intent(in) :: kstp
     integer(I4B), intent(in) :: nstp
     integer(I4B), intent(in) :: iout
+    integer(I4B), optional, intent(in) :: iprint_opt
+    integer(I4B), optional, intent(in) :: isav_opt
     ! -- local
     integer(I4B) :: iprint
     integer(I4B) :: idataun
 ! ------------------------------------------------------------------------------
     !
+    ! -- initialize
     iprint = 0
-    if(this%psmobj%kstp_to_print(kstp, nstp)) then
-      iprint = 1
-      ipflg = 1
-    endif
+    ipflg = 0
     idataun = 0
-    if(this%psmobj%kstp_to_save(kstp, nstp)) idataun = this%idataun
+    !
+    ! -- Determine whether or not to print the array.  The present
+    !    check allows a caller to override the print/save manager
+    if (present(iprint_opt)) then
+      if (iprint_opt /= 0) then
+        iprint = 1
+        ipflg = 1
+      endif
+    else
+      if(this%psmobj%kstp_to_print(kstp, nstp)) then
+        iprint = 1
+        ipflg = 1
+      endif
+    endif
+    !
+    ! -- determine whether or not to save the array to a file
+    if (present(isav_opt)) then
+      if (isav_opt /= 0) then
+        idataun = this%idataun
+      endif
+    else
+      if(this%psmobj%kstp_to_save(kstp, nstp)) idataun = this%idataun
+    endif
     !
     ! -- Record double precision array
     if(associated(this%dblvec))                                                &
@@ -175,7 +197,7 @@ module OutputControlData
     ! -- dummy
     class(OutputControlDataType) :: this
     character(len=*), intent(in) :: cname
-    real(DP), dimension(:), pointer, intent(in) :: dblvec
+    real(DP), dimension(:), pointer, contiguous, intent(in) :: dblvec
     class(DisBaseType), pointer, intent(in) :: dis
     character(len=*), intent(in) :: cdefpsm
     character(len=*), intent(in) :: cdeffmp
@@ -207,7 +229,7 @@ module OutputControlData
     ! -- dummy
     class(OutputControlDataType) :: this
     character(len=*), intent(in) :: cname
-    integer(I4B), dimension(:), pointer, intent(in) :: intvec
+    integer(I4B), dimension(:), pointer, contiguous, intent(in) :: intvec
     class(DisBaseType), pointer, intent(in) :: dis
     character(len=*), intent(in) :: cdefpsm
     character(len=*), intent(in) :: cdeffmp

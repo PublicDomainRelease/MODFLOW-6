@@ -19,10 +19,10 @@ module RchModule
   character(len=LENPACKAGENAME) :: text  = '             RCH'
   !
   type, extends(BndType) :: RchType
-    integer(I4B), pointer               :: inirch     => NULL()
-    integer(I4B), pointer, dimension(:) :: nodesontop => NULL()                 ! User provided cell numbers; nodelist is cells where recharge is applied)
-    logical, private                    :: fixed_cell = .false.
-    logical, private                    :: read_as_arrays = .false.
+    integer(I4B), pointer :: inirch => NULL()
+    integer(I4B), dimension(:), pointer, contiguous :: nodesontop => NULL()      ! User provided cell numbers; nodelist is cells where recharge is applied)
+    logical, private :: fixed_cell = .false.
+    logical, private :: read_as_arrays = .false.
   contains
     procedure :: rch_allocate_scalars
     procedure :: bnd_options         => rch_options
@@ -86,6 +86,7 @@ module RchModule
     packobj%ibcnum = ibcnum
     packobj%ncolbnd = 1
     packobj%iscloc = 1   ! sfac applies to recharge rate
+    packobj%ictorigin = 'NPF'
     ! indxconvertflux is Column index of bound that will be multiplied by
     ! cell area to convert flux rates to flow rates
     packobj%indxconvertflux = 1
@@ -402,11 +403,13 @@ module RchModule
     integer(I4B) :: ipos
     integer(I4B) :: jcol, jauxcol, lpos, ivarsread
     character(len=LENTIMESERIESNAME) :: tasName
-    character(len=24) ::  atemp
     character(len=24), dimension(2) :: aname
-    character(len=LINELENGTH) :: keyword
+    character(len=LINELENGTH) :: keyword, atemp
     logical :: found, endOfBlock
     logical :: convertFlux
+    !
+    ! -- these time array series pointers need to be non-contiguous
+    !    beacuse a slice of bound is passed
     real(DP), dimension(:), pointer :: bndArrayPtr => null()
     real(DP), dimension(:), pointer :: auxArrayPtr => null()
     real(DP), dimension(:), pointer :: auxMultArray => null()

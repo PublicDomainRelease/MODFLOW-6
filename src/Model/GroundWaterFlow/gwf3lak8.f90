@@ -37,17 +37,17 @@ module LakModule
   character(len=LENPACKAGENAME) :: text  = '             LAK'
   !
   type LakTabType
-    real(DP), pointer, dimension(:)  :: tabstage => null()
-    real(DP), pointer, dimension(:)  :: tabvolume => null()
-    real(DP), pointer, dimension(:)  :: tabsarea => null()
-    real(DP), pointer, dimension(:)  :: tabwarea => null()
+    real(DP), dimension(:), pointer, contiguous  :: tabstage => null()
+    real(DP), dimension(:), pointer, contiguous  :: tabvolume => null()
+    real(DP), dimension(:), pointer, contiguous  :: tabsarea => null()
+    real(DP), dimension(:), pointer, contiguous  :: tabwarea => null()
   end type LakTabType
   !
   type, extends(BndType) :: LakType
     ! -- scalars
     ! -- characters
-    character(len=16), dimension(:), pointer :: clakbudget => NULL()
-    character(len=16), dimension(:), pointer :: cauxcbc => NULL()
+    character(len=16), dimension(:), pointer, contiguous :: clakbudget => NULL()
+    character(len=16), dimension(:), pointer, contiguous :: cauxcbc => NULL()
     ! -- integers
     integer(I4B), pointer :: iprhed => null()
     integer(I4B), pointer :: istageout => null()
@@ -70,86 +70,90 @@ module LakModule
     integer(I4B), pointer :: bditems => NULL()
     ! -- vectors
     ! -- lake data
-    integer(I4B), pointer, dimension(:) :: nlakeconn => null()
-    integer(I4B), pointer, dimension(:) :: idxlakeconn => null()
-    integer(I4B), pointer, dimension(:) :: ntabrow => null()
-    real(DP), pointer, dimension(:)  :: strt => null()
-    real(DP), pointer, dimension(:)  :: laketop => null()
-    real(DP), pointer, dimension(:)  :: lakebot => null()
-    real(DP), pointer, dimension(:)  :: sareamax => null()
-    character(len=LENBOUNDNAME), pointer, dimension(:) :: lakename => null()
-    character (len=8), pointer, dimension(:) :: status => null()
-    real(DP), pointer, dimension(:)  :: avail => null()
-    real(DP), pointer, dimension(:)  :: lkgwsink => null()
+    integer(I4B), dimension(:), pointer, contiguous :: nlakeconn => null()
+    integer(I4B), dimension(:), pointer, contiguous :: idxlakeconn => null()
+    integer(I4B), dimension(:), pointer, contiguous :: ntabrow => null()
+    real(DP), dimension(:), pointer, contiguous  :: strt => null()
+    real(DP), dimension(:), pointer, contiguous  :: laketop => null()
+    real(DP), dimension(:), pointer, contiguous  :: lakebot => null()
+    real(DP), dimension(:), pointer, contiguous  :: sareamax => null()
+    character(len=LENBOUNDNAME), dimension(:), pointer,                         &
+                                 contiguous :: lakename => null()
+    character (len=8), dimension(:), pointer, contiguous :: status => null()
+    real(DP), dimension(:), pointer, contiguous  :: avail => null()
+    real(DP), dimension(:), pointer, contiguous  :: lkgwsink => null()
     ! -- time series aware data
-    type (MemoryTSType), pointer, dimension(:) :: stage => null()
-    type (MemoryTSType), pointer, dimension(:) :: rainfall => null()
-    type (MemoryTSType), pointer, dimension(:) :: evaporation => null()
-    type (MemoryTSType), pointer, dimension(:) :: runoff => null()
-    type (MemoryTSType), pointer, dimension(:) :: inflow => null()
-    type (MemoryTSType), pointer, dimension(:) :: withdrawal => null()
-    type (MemoryTSType), pointer, dimension(:) :: lauxvar => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: stage => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: rainfall => null()
+    type (MemoryTSType), dimension(:), pointer,                                 &
+                         contiguous :: evaporation => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: runoff => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: inflow => null()
+    type (MemoryTSType), dimension(:), pointer,                                 &
+                         contiguous :: withdrawal => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: lauxvar => null()
     !
     ! -- table data
-    type (LakTabType), pointer, dimension(:) :: laketables => null()
+    type (LakTabType), dimension(:), pointer, contiguous :: laketables => null()
     !
     ! -- lake solution data
-    integer(I4B), pointer, dimension(:) :: ncncvr => null()
-    real(DP), pointer, dimension(:)  :: surfin => null()
-    real(DP), pointer, dimension(:)  :: surfout => null()
-    real(DP), pointer, dimension(:)  :: surfout1 => null()
-    real(DP), pointer, dimension(:)  :: precip => null()
-    real(DP), pointer, dimension(:)  :: precip1 => null()
-    real(DP), pointer, dimension(:)  :: evap => null()
-    real(DP), pointer, dimension(:)  :: evap1 => null()
-    real(DP), pointer, dimension(:)  :: evapo => null()
-    real(DP), pointer, dimension(:)  :: withr => null()
-    real(DP), pointer, dimension(:)  :: withr1 => null()
-    real(DP), pointer, dimension(:)  :: flwin => null()
-    real(DP), pointer, dimension(:)  :: flwiter => null()
-    real(DP), pointer, dimension(:)  :: flwiter1 => null()
-    real(DP), pointer, dimension(:)  :: seep => null()
-    real(DP), pointer, dimension(:)  :: seep1 => null()
-    real(DP), pointer, dimension(:)  :: seep0 => null()
-    real(DP), pointer, dimension(:)  :: stageiter => null()
-    real(DP), pointer, dimension(:)  :: chterm => null()
+    integer(I4B), dimension(:), pointer, contiguous :: ncncvr => null()
+    real(DP), dimension(:), pointer, contiguous  :: surfin => null()
+    real(DP), dimension(:), pointer, contiguous  :: surfout => null()
+    real(DP), dimension(:), pointer, contiguous  :: surfout1 => null()
+    real(DP), dimension(:), pointer, contiguous  :: precip => null()
+    real(DP), dimension(:), pointer, contiguous  :: precip1 => null()
+    real(DP), dimension(:), pointer, contiguous  :: evap => null()
+    real(DP), dimension(:), pointer, contiguous  :: evap1 => null()
+    real(DP), dimension(:), pointer, contiguous  :: evapo => null()
+    real(DP), dimension(:), pointer, contiguous  :: withr => null()
+    real(DP), dimension(:), pointer, contiguous  :: withr1 => null()
+    real(DP), dimension(:), pointer, contiguous  :: flwin => null()
+    real(DP), dimension(:), pointer, contiguous  :: flwiter => null()
+    real(DP), dimension(:), pointer, contiguous  :: flwiter1 => null()
+    real(DP), dimension(:), pointer, contiguous  :: seep => null()
+    real(DP), dimension(:), pointer, contiguous  :: seep1 => null()
+    real(DP), dimension(:), pointer, contiguous  :: seep0 => null()
+    real(DP), dimension(:), pointer, contiguous  :: stageiter => null()
+    real(DP), dimension(:), pointer, contiguous  :: chterm => null()
     !
     ! -- lake convergence
-    integer(I4B), pointer, dimension(:) :: iseepc => null()
-    integer(I4B), pointer, dimension(:) :: idhc => null()
-    real(DP), pointer, dimension(:) :: en1 => null()
-    real(DP), pointer, dimension(:) :: en2 => null()
-    real(DP), pointer, dimension(:) :: r1 => null()
-    real(DP), pointer, dimension(:) :: r2 => null()
-    real(DP), pointer, dimension(:) :: dh0 => null()
-    real(DP), pointer, dimension(:) :: s0 => null()
+    integer(I4B), dimension(:), pointer, contiguous :: iseepc => null()
+    integer(I4B), dimension(:), pointer, contiguous :: idhc => null()
+    real(DP), dimension(:), pointer, contiguous :: en1 => null()
+    real(DP), dimension(:), pointer, contiguous :: en2 => null()
+    real(DP), dimension(:), pointer, contiguous :: r1 => null()
+    real(DP), dimension(:), pointer, contiguous :: r2 => null()
+    real(DP), dimension(:), pointer, contiguous :: dh0 => null()
+    real(DP), dimension(:), pointer, contiguous :: s0 => null()
     !
     ! -- lake connection data
-    integer(I4B), pointer, dimension(:) :: imap => null()
-    integer(I4B), pointer, dimension(:) :: cellid => null()
-    integer(I4B), pointer, dimension(:) :: nodesontop => null()
-    integer(I4B), pointer, dimension(:) :: ictype => null()
-    real(DP), pointer, dimension(:)  :: bedleak => null()
-    real(DP), pointer, dimension(:)  :: belev => null()
-    real(DP), pointer, dimension(:)  :: telev => null()
-    real(DP), pointer, dimension(:)  :: connlength => null()
-    real(DP), pointer, dimension(:)  :: connwidth => null()
-    real(DP), pointer, dimension(:)  :: sarea => null()
-    real(DP), pointer, dimension(:)  :: warea => null()
-    real(DP), pointer, dimension(:)  :: satcond => null()
-    real(DP), pointer, dimension(:)  :: simcond => null()
-    real(DP), pointer, dimension(:)  :: simlakgw => null()
+    integer(I4B), dimension(:), pointer, contiguous :: imap => null()
+    integer(I4B), dimension(:), pointer, contiguous :: cellid => null()
+    integer(I4B), dimension(:), pointer, contiguous :: nodesontop => null()
+    integer(I4B), dimension(:), pointer, contiguous :: ictype => null()
+    real(DP), dimension(:), pointer, contiguous  :: bedleak => null()
+    real(DP), dimension(:), pointer, contiguous  :: belev => null()
+    real(DP), dimension(:), pointer, contiguous  :: telev => null()
+    real(DP), dimension(:), pointer, contiguous  :: connlength => null()
+    real(DP), dimension(:), pointer, contiguous  :: connwidth => null()
+    real(DP), dimension(:), pointer, contiguous  :: sarea => null()
+    real(DP), dimension(:), pointer, contiguous  :: warea => null()
+    real(DP), dimension(:), pointer, contiguous  :: satcond => null()
+    real(DP), dimension(:), pointer, contiguous  :: simcond => null()
+    real(DP), dimension(:), pointer, contiguous  :: simlakgw => null()
     !
     ! -- lake outlet data
-    integer(I4B), pointer, dimension(:) :: lakein => null()
-    integer(I4B), pointer, dimension(:) :: lakeout => null()
-    integer(I4B), pointer, dimension(:) :: iouttype => null()
-    type (MemoryTSType), pointer, dimension(:) :: outrate => null()
-    type (MemoryTSType), pointer, dimension(:) :: outinvert => null()
-    type (MemoryTSType), pointer, dimension(:) :: outwidth => null()
-    type (MemoryTSType), pointer, dimension(:) :: outrough => null()
-    type (MemoryTSType), pointer, dimension(:) :: outslope => null()
-    real(DP), pointer, dimension(:)  :: simoutrate => null()
+    integer(I4B), dimension(:), pointer, contiguous :: lakein => null()
+    integer(I4B), dimension(:), pointer, contiguous :: lakeout => null()
+    integer(I4B), dimension(:), pointer, contiguous :: iouttype => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: outrate => null()
+    type (MemoryTSType), dimension(:), pointer,                                 &
+                         contiguous :: outinvert => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: outwidth => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: outrough => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: outslope => null()
+    real(DP), dimension(:), pointer, contiguous  :: simoutrate => null()
     !
     ! -- lake output data
     real(DP), dimension(:), pointer, contiguous :: qauxcbc => null()
@@ -161,15 +165,15 @@ module LakModule
     type(BudgetType), pointer :: budget => NULL()
     ! -- pointer to gwf iss and gwf hk
     integer(I4B), pointer :: gwfiss => NULL()
-    real(DP), dimension(:), pointer :: gwfk11 => NULL()
-    real(DP), dimension(:), pointer :: gwfk33 => NULL()
-    real(DP), dimension(:), pointer :: gwfsat => NULL()
+    real(DP), dimension(:), pointer, contiguous :: gwfk11 => NULL()
+    real(DP), dimension(:), pointer, contiguous :: gwfk33 => NULL()
+    real(DP), dimension(:), pointer, contiguous :: gwfsat => NULL()
     integer(I4B), pointer :: gwfik33 => NULL()
     !
     ! -- package x, xold, and ibound
-    integer(I4B), pointer, dimension(:) :: iboundpak     => null() !package ibound
-    real(DP), pointer, dimension(:)     :: xnewpak       => null() !package x vector
-    real(DP), pointer, dimension(:)     :: xoldpak       => null() !package xold vector
+    integer(I4B), dimension(:), pointer, contiguous :: iboundpak => null()       !package ibound
+    real(DP), dimension(:), pointer, contiguous :: xnewpak => null()             !package x vector
+    real(DP), dimension(:), pointer, contiguous :: xoldpak => null()             !package xold vector
     !
     ! -- type bound procedures
     contains
@@ -279,6 +283,7 @@ contains
     packobj%ibcnum = ibcnum
     packobj%ncolbnd = 3
     packobj%iscloc = 0  ! not supported
+    packobj%ictorigin = 'NPF'
     !
     ! -- return
     return
@@ -434,7 +439,7 @@ contains
     integer(I4B) :: itmp
     integer(I4B) :: nlak
     integer(I4B) :: nconn
-    integer(I4B), dimension(:), pointer :: nboundchk
+    integer(I4B), dimension(:), pointer, contiguous :: nboundchk
     ! -- format
     !
     ! -- code
@@ -553,7 +558,7 @@ contains
 
         if (ival < 0) then
           write(errmsg,'(4x,a,1x,i6)') &
-            '****ERROR. nlakecon MUST BE >= 0 for lake ', n
+            '****ERROR. nlakeconn MUST BE >= 0 for lake ', n
           call store_error(errmsg)
         end if
 
@@ -671,7 +676,7 @@ contains
     integer(I4B) :: ipos, ipos0
     integer(I4B) :: icellid, icellid0
     real(DP) :: top, bot
-    integer(I4B), dimension(:), pointer :: nboundchk
+    integer(I4B), dimension(:), pointer, contiguous :: nboundchk
 
     ! -- format
     !
@@ -970,7 +975,7 @@ contains
     logical :: isfound, endOfBlock
     integer(I4B) :: n
     integer(I4B) :: ntabs
-    integer(I4B), dimension(:), pointer :: nboundchk
+    integer(I4B), dimension(:), pointer, contiguous :: nboundchk
 ! ------------------------------------------------------------------------------
 
     ! -- format
@@ -1337,7 +1342,7 @@ contains
     !integer(I4B) :: ii, jj, kk, nn
     integer(I4B) :: jj
     real(DP) :: endtim
-    integer(I4B), dimension(:), pointer :: nboundchk
+    integer(I4B), dimension(:), pointer, contiguous :: nboundchk
     !
     ! -- format
     !
@@ -2346,8 +2351,8 @@ contains
 
   subroutine lak_calculate_storagechange(this, ilak, stage, stage0, delt, dvr)
 ! ******************************************************************************
-! lak_calculate_storagechange -- Calculate the inflow terms to a lake at a
-!                         provided stage.
+! lak_calculate_storagechange -- Calculate the storage change in a lake based on
+!                         provided stages and a passed delt.
 ! ******************************************************************************
 !
 !    SPECIFICATIONS:
@@ -2993,7 +2998,7 @@ contains
         !bndName = this%boundname(itemno)
         call urword(line, lloc, istart, istop, 1, ival, rval, this%iout, this%inunit)
         text = line(istart:istop)
-        this%status(itmp) = text
+        this%status(itmp) = text(1:8)
         if (text == 'CONSTANT') then
           this%iboundpak(itmp) = -1
         else if (text == 'INACTIVE') then
@@ -3782,22 +3787,27 @@ contains
     return
   end subroutine lak_fn
 
-  subroutine lak_cc(this, iend, icnvg)
+  subroutine lak_cc(this, iend, icnvg, hclose, rclose)
 ! **************************************************************************
 ! lak_cc -- Final convergence check for package
 ! **************************************************************************
 !
 !    SPECIFICATIONS:
 ! --------------------------------------------------------------------------
+    use TdisModule, only: delt
     ! -- dummy
     class(LakType), intent(inout) :: this
     integer(I4B), intent(in) :: iend
     integer(I4B), intent(inout) :: icnvg
+    real(DP), intent(in) :: hclose
+    real(DP), intent(in) :: rclose
     ! -- local
     integer(I4B) :: n
     integer(I4B) :: ifirst
     real(DP) :: dh
+    real(DP) :: residb0
     real(DP) :: residb
+    real(DP) :: dr
     real(DP) :: inf
     real(DP) :: outf
     real(DP) :: avgf
@@ -3817,8 +3827,10 @@ contains
     if (this%iconvchk /= 0) then
       final_check: do n = 1, this%nlakes
         if (this%iboundpak(n) < 1) cycle
-        dh = ABS(this%s0(n) - this%xnewpak(n))
+        dh = this%s0(n) - this%xnewpak(n)
+        call this%lak_calculate_residual(n, this%s0(n), residb0)
         call this%lak_calculate_residual(n, this%xnewpak(n), residb)
+        dr = residb0 - residb
         call this%lak_calculate_available(n, this%xnewpak(n), inf, &
                                           ra, ro, qinf, ex)
         outf = inf - residb
@@ -3830,7 +3842,7 @@ contains
           end if
         end if
         !write(*,'(1x,i4,6(1x,g10.4))') n, this%s0(n), this%xnewpak(n), residb, outf, inf, pd
-        if (dh > this%delh .or. ABS(pd) > this%pdmax) then
+        if (ABS(dh) > hclose .or. ABS(pd) > this%pdmax) then
           icnvg = 0
           ! write convergence check information if this is the last outer iteration
           if (iend == 1) then
@@ -3838,10 +3850,11 @@ contains
               ifirst = 0
               write(*,2030) this%name
               write(this%iout, 2000) '      LAKE',                                 &
-                '        MAX. DH', '    DH CRITERIA',                              &
-                '      PCT DIFF.', 'PCT DIFF. CRIT.'
+                '             DH', '    DH CRITERIA',                              &
+                '        PCTDIFF', ' PCTDIFF CRITER'
             end if
-            write(this%iout,2010) n, dh, this%delh, pd, this%pdmax
+            !write(this%iout,2010) n, dh, this%delh, pd, this%pdmax
+            write(this%iout,2010) n, dh, hclose, pd, this%pdmax
           else
             exit final_check
           end if
@@ -4897,10 +4910,10 @@ contains
 ! ------------------------------------------------------------------------------
     class(LakType) :: this
     integer(I4B), pointer :: neq
-    integer(I4B), dimension(:), pointer :: ibound
-    real(DP), dimension(:), pointer :: xnew
-    real(DP), dimension(:), pointer :: xold
-    real(DP), dimension(:), pointer :: flowja
+    integer(I4B), dimension(:), pointer, contiguous :: ibound
+    real(DP), dimension(:), pointer, contiguous :: xnew
+    real(DP), dimension(:), pointer, contiguous :: xold
+    real(DP), dimension(:), pointer, contiguous :: flowja
     ! -- local
 ! ------------------------------------------------------------------------------
     !
@@ -6016,29 +6029,6 @@ contains
     ! -- calculate the available water
     call this%lak_calculate_available(n, hlak, avail, &
                                       ra, ro, qinf, ex, hp)
-    !!
-    !! -- calculate the aquifer sources to the lake
-    !do j = this%idxlakeconn(n), this%idxlakeconn(n+1)-1
-    !  igwfnode = this%cellid(j)
-    !  head = this%xnew(igwfnode) + hp
-    !  call this%lak_estimate_conn_exchange(1, n, j, idry, hlak, head, qlakgw, clak, avail)
-    !end do
-    !!
-    !! -- add rainfall
-    !call this%lak_calculate_rainfall(n, hlak, ra)
-    !avail = avail + ra
-    !!
-    !! -- calculate runoff
-    !call this%lak_calculate_runoff(n, ro)
-    !avail = avail + ro
-    !!
-    !! -- calculate inflow
-    !call this%lak_calculate_inflow(n, qinf)
-    !avail = avail + qinf
-    !!
-    !! -- calculate external flow terms
-    !call this%lak_calculate_external(n, ex)
-    !avail = avail + ex
     !
     ! -- calculate groundwater seepage
     do j = this%idxlakeconn(n), this%idxlakeconn(n+1)-1

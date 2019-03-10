@@ -4,7 +4,8 @@
   use ConstantsModule, only: LINELENGTH, LENSOLUTIONNAME,                      &
                              IZERO, DZERO, DPREC, DSAME,                       &
                              DEM8, DEM6, DEM5, DEM4, DEM3, DEM2, DEM1,         &
-                             DONE, DTWO
+                             DHALF, DONE, DTWO
+  use GenericUtilities, only: IS_SAME
   use IMSReorderingModule, only: ims_genrcm, ims_odrv, ims_dperm, ims_vperm
   use BlockParserModule, only: BlockParserType
 
@@ -41,48 +42,49 @@
     ! POINTERS TO SOLUTION VARIABLES
     integer(I4B), POINTER :: NEQ => NULL()
     integer(I4B), POINTER :: NJA => NULL()
-    integer(I4B), DIMENSION(:), POINTER, CONTIGUOUS :: IA => NULL()
-    integer(I4B), DIMENSION(:), POINTER, CONTIGUOUS :: JA => NULL()
-    real(DP), DIMENSION(:), POINTER, CONTIGUOUS :: AMAT => NULL()
-    real(DP), DIMENSION(:), POINTER :: RHS => NULL()
-    real(DP), DIMENSION(:), POINTER :: X => NULL()
+    integer(I4B), dimension(:), pointer, contiguous :: IA => NULL()
+    integer(I4B), dimension(:), pointer, contiguous :: JA => NULL()
+    real(DP), dimension(:), pointer, contiguous :: AMAT => NULL()
+    real(DP), dimension(:), pointer, contiguous :: RHS => NULL()
+    real(DP), dimension(:), pointer, contiguous :: X => NULL()
     ! VECTORS
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::DSCALE => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::DSCALE2 => NULL()
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::IAPC => NULL()
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::JAPC => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::APC => NULL()
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::LORDER => NULL()
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::IORDER => NULL()
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::IARO => NULL()
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::JARO => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::ARO => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: DSCALE => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: DSCALE2 => NULL()
+    integer(I4B), POINTER,DIMENSION(:),CONTIGUOUS :: IAPC => NULL()
+    integer(I4B), POINTER,DIMENSION(:),CONTIGUOUS :: JAPC => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: APC => NULL()
+    integer(I4B), POINTER, DIMENSION(:), CONTIGUOUS :: LORDER => NULL()
+    integer(I4B), POINTER, DIMENSION(:), CONTIGUOUS :: IORDER => NULL()
+    integer(I4B), POINTER, DIMENSION(:), CONTIGUOUS :: IARO => NULL()
+    integer(I4B), POINTER, DIMENSION(:), CONTIGUOUS :: JARO => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: ARO => NULL()
     ! WORKING ARRAYS
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::IW => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::W => NULL()
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::ID => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::D => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::P => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::Q => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::Z => NULL()
+    integer(I4B), POINTER, DIMENSION(:), CONTIGUOUS :: IW => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: W => NULL()
+    integer(I4B), POINTER, DIMENSION(:), CONTIGUOUS :: ID => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: D => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: P => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: Q => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: Z => NULL()
     ! BICGSTAB WORKING ARRAYS
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::T => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::V => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::DHAT => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::PHAT => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::QHAT => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: T => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: V => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: DHAT => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: PHAT => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: QHAT => NULL()
     ! POINTERS FOR USE WITH BOTH ORIGINAL AND RCM ORDERINGS
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::IA0 => NULL()
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::JA0 => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::A0 => NULL()
+    integer(I4B), POINTER, DIMENSION(:), CONTIGUOUS :: IA0 => NULL()
+    integer(I4B), POINTER, DIMENSION(:), CONTIGUOUS :: JA0 => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: A0 => NULL()
     ! ILUT WORKING ARRAYS
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::JLU => NULL()
-    integer(I4B),POINTER,DIMENSION(:),CONTIGUOUS::JW => NULL()
-    real(DP),POINTER,DIMENSION(:),CONTIGUOUS::WLU => NULL()
+    integer(I4B), POINTER, DIMENSION(:), CONTIGUOUS :: JLU => NULL()
+    integer(I4B), POINTER, DIMENSION(:), CONTIGUOUS :: JW => NULL()
+    real(DP), POINTER, DIMENSION(:), CONTIGUOUS :: WLU => NULL()
     
     ! PROCEDURES (METHODS)
     CONTAINS
       PROCEDURE :: IMSLINEAR_ALLOCATE => IMSLINEAR_AR
+      procedure :: imslinear_summary
       PROCEDURE :: IMSLINEAR_APPLY => IMSLINEAR_AP
       procedure :: IMSLINEAR_DA
       procedure, private :: allocate_scalars
@@ -105,7 +107,7 @@
 !     ------------------------------------------------------------------
       use MemoryManagerModule, only: mem_allocate
       use SimModule, only: ustop, store_error, count_errors
-      IMPLICIT NONE
+      !IMPLICIT NONE
 !     + + + DUMMY VARIABLES + + +
       CLASS(IMSLINEAR_DATA), INTENT(INOUT) :: THIS
       CHARACTER (LEN=LENSOLUTIONNAME), INTENT(IN) :: NAME
@@ -127,13 +129,13 @@
 !     + + + LOCAL VARIABLES + + +
       LOGICAL :: lreaddata
       character(len=LINELENGTH) :: errmsg, keyword
-      CHARACTER (LEN= 10) :: clin(0:2)
-      CHARACTER (LEN= 31) :: clintit(0:2)
-      CHARACTER (LEN= 20) :: cipc(0:4)
-      CHARACTER (LEN= 20) :: cscale(0:2)
-      CHARACTER (LEN= 25) :: corder(0:2)
-      CHARACTER (LEN= 16), DIMENSION(0:4) :: ccnvgopt
-      CHARACTER (LEN= 15) :: clevel, cdroptol 
+      !CHARACTER (LEN= 10) :: clin(0:2)
+      !CHARACTER (LEN= 31) :: clintit(0:2)
+      !CHARACTER (LEN= 20) :: cipc(0:4)
+      !CHARACTER (LEN= 20) :: cscale(0:2)
+      !CHARACTER (LEN= 25) :: corder(0:2)
+      !CHARACTER (LEN= 16), DIMENSION(0:4) :: ccnvgopt
+      !CHARACTER (LEN= 15) :: clevel, cdroptol 
       integer(I4B) :: i, n
       integer(I4B) :: i0
       integer(I4B) :: iscllen, iolen
@@ -145,59 +147,12 @@
       integer(I4B) :: iwlu
       integer(I4B) :: iwk
 !     + + + PARAMETERS + + +
-!       DATA
-      DATA clin  /'UNKNOWN   ', &
-                  'CG        ', &
-     &            'BCGS      '/
-      DATA clintit  /'             UNKNOWN           ', &
-                     '       CONJUGATE-GRADIENT      ', &
-     &               'BICONJUGATE-GRADIENT STABILIZED'/
-      DATA cipc  /'UNKNOWN             ', &
-     &            'INCOMPLETE LU       ', &
-     &            'MOD. INCOMPLETE LU  ', &
-     &            'INCOMPLETE LUT      ', &
-     &            'MOD. INCOMPLETE LUT '/
-      DATA cscale/'NO SCALING          ', &
-     &            'SYMMETRIC SCALING   ', &
-     &            'L2 NORM SCALING     '/
-      DATA corder/'ORIGINAL ORDERING        ', &
-     &            'RCM ORDERING             ', &
-     &            'MINIMUM DEGREE ORDERING  '/
-      DATA ccnvgopt  /'INFINITY NORM   ', &
-     &                'INFINITY NORM S ', &
-     &                'L2 NORM         ', &
-     &                'RELATIVE L2NORM ', &
-                      'L2 NORM W. REL. '/
-!       OUTPUT FORMATS
-02010 FORMAT (1X,/,7X,'SOLUTION BY THE',1X,A31,1X,'METHOD', &
-     &        /,1X,66('-'),/, &
-     &        ' MAXIMUM OF ',I6,' CALLS OF SOLUTION ROUTINE',/, &
-     &        ' MAXIMUM OF ',I6, &
-     &        ' INTERNAL ITERATIONS PER CALL TO SOLUTION ROUTINE',/, &
-     &        ' LINEAR ACCELERATION METHOD            =',1X,A,/, &
-     &        ' MATRIX PRECONDITIONING TYPE           =',1X,A,/, &
-     &        ' MATRIX SCALING APPROACH               =',1X,A,/, &
-     &        ' MATRIX REORDERING APPROACH            =',1X,A,/, &
-     &        ' NUMBER OF ORTHOGONALIZATIONS          =',I9,/, &
-     &        ' HEAD CHANGE CRITERION FOR CLOSURE     =',E15.5,/, &
-     &        ' RESIDUAL CHANGE CRITERION FOR CLOSURE =',E15.5,/, &
-     &        ' RESIDUAL CONVERGENCE OPTION           =',I9,/, &
-     &        ' RESIDUAL CONVERGENCE NORM             =',1X,A,/, &
-     &        ' RELAXATION FACTOR                     =',E15.5)
-02015 FORMAT (' NUMBER OF LEVELS                      =',A15,/, &
-     &        ' DROP TOLERANCE                        =',A15,//)
-02020 FORMAT (///,1X,'IMSLINEAR DATA INPUT ERROR:', &
-     &          /,2X,'SCALING MUST BE USED (ISCL.GT.0) IF USING', &
-     &          /,2X,'THE ILU0 OR MILU0 PRECONDITIONERS (IPC.EQ.2 OR', &
-     &          /,2X,'IPC.EQ.3) WITH MATRIX REORDERING (IORD.GT.0)')
-2030  FORMAT(1X,A20,1X,6(I6,1X))
-2040  FORMAT(1X,20('-'),1X,6(6('-'),1X))
-2050  FORMAT(1X,62('-'),/)
+!     + + + OUTPUT FORMATS + + +
 !------------------------------------------------------------------
 !
 !-------SET LREADDATA
       IF (PRESENT(LFINDBLOCK)) THEN
-        IF (LFINDBLOCK .LT. 1) THEN
+        IF (LFINDBLOCK < 1) THEN
           lreaddata = .FALSE.
         ELSE
           lreaddata = .TRUE.
@@ -230,8 +185,8 @@
       THIS%IPC = 0
       THIS%LEVEL = 0
       
-      clevel = ''
-      cdroptol = ''
+      !clevel = ''
+      !cdroptol = ''
 !
 !-------TRANSFER COMMON VARIABLES FROM IMS TO IMSLINEAR
       THIS%ILINMETH = 0
@@ -286,7 +241,7 @@
               else if (keyword == 'RELATIVE_RCLOSE') then
                 THIS%ICNVGOPT = 3
               else if (keyword == 'L2NORM_RELATIVE_RCLOSE') then
-                THIS%ICNVGOPT = 3
+                THIS%ICNVGOPT = 4
               end if
             case ('INNER_MAXIMUM')
               i = parser%GetInteger()
@@ -352,7 +307,7 @@
      &            'MUST BE GREATER THAN OR EQUAL TO ZERO'
                 call store_error(errmsg)
               end if
-              write (clevel, '(i15)') i
+              !write (clevel, '(i15)') i
             case ('PRECONDITIONER_DROP_TOLERANCE')
               r = parser%GetDouble()
               THIS%DROPTOL = r
@@ -362,7 +317,7 @@
      &            'MUST BE GREATER THAN OR EQUAL TO ZERO'
                 call store_error(errmsg)
               end if
-              write (cdroptol, '(e15.5)') r
+              !write (cdroptol, '(e15.5)') r
             case default
               write(errmsg,'(4x,a,a)') &
      &          '****WARNING. UNKNOWN IMSLINEAR KEYWORD: ', &
@@ -372,7 +327,7 @@
         end do
         write(iout,'(1x,a)') 'END OF LINEAR DATA'
       else
-        if (IFDPARAM.EQ.0) THEN
+        if (IFDPARAM ==  0) THEN
           write(errmsg,'(1x,a)') 'NO LINEAR BLOCK DETECTED.'
           call store_error(errmsg)
         end if
@@ -391,13 +346,13 @@
       END IF
 !
 !-------ERROR CHECKING FOR OPTIONS
-      IF (THIS%ISCL.LT.0 ) THIS%ISCL = 0
-      IF (THIS%ISCL.GT.2 ) THEN
+      IF (THIS%ISCL < 0 ) THIS%ISCL = 0
+      IF (THIS%ISCL > 2 ) THEN
         WRITE( errmsg,'(A)' ) 'IMSLINEAR7AR: ISCL MUST BE .LE. 2'
         call store_error(errmsg)
       END IF
-      IF (THIS%IORD.LT.0 ) THIS%IORD = 0
-      IF (THIS%IORD.GT.2) THEN
+      IF (THIS%IORD < 0 ) THIS%IORD = 0
+      IF (THIS%IORD > 2) THEN
         WRITE( errmsg,'(A)' ) 'IMSLINEAR7AR: IORD MUST BE .LE. 2'
         call store_error(errmsg)
       END IF
@@ -405,17 +360,17 @@
         WRITE( errmsg,'(A)' ) 'IMSLINEAR7AR: NORTH MUST .GE. 0'
         call store_error(errmsg)
       END IF
-      IF (THIS%RCLOSE.EQ.DZERO) THEN
+      IF (THIS%RCLOSE ==  DZERO) THEN
         IF (THIS%ICNVGOPT /= 3) THEN
           WRITE( errmsg,'(A)' ) 'IMSLINEAR7AR: RCLOSE MUST .NE. 0.0'
           call store_error(errmsg)
         END IF
       END IF
-      IF (THIS%RELAX.LT.DZERO) THEN
+      IF (THIS%RELAX < DZERO) THEN
         WRITE( errmsg,'(A)' ) 'IMSLINEAR7AR: RELAX MUST BE .GE. 0.0'
         call store_error(errmsg)
       END IF
-      IF (THIS%RELAX.GT.DONE) THEN
+      IF (THIS%RELAX > DONE) THEN
         WRITE( errmsg,'(A)' ) 'IMSLINEAR7AR: RELAX MUST BE .LE. 1.0'
         call store_error(errmsg)
       END IF
@@ -424,20 +379,6 @@
         call parser%StoreErrorUnit()
         call ustop()
       endif
-!
-!-------PRINT MXITER,ITER1,IPC,ISCL,IORD,HCLOSE,RCLOSE
-      WRITE (IOUT,2010) clintit(THIS%ILINMETH), MXITER, THIS%ITER1, &
-     &                  clin(THIS%ILINMETH), cipc(THIS%IPC),        &
-     &                  cscale(THIS%ISCL), corder(THIS%IORD),       &
-     &                  THIS%NORTH, THIS%HCLOSE, THIS%RCLOSE,       &
-     &                  THIS%ICNVGOPT, ccnvgopt(THIS%ICNVGOPT),    &
-     &                  THIS%RELAX
-      IF (THIS%LEVEL > 0 .OR. THIS%DROPTOL > DZERO) THEN
-        WRITE (IOUT,2015) trim(adjustl(clevel)), &
-     &                    trim(adjustl(cdroptol))
-      ELSE
-         WRITE (IOUT,'(//)')
-      END IF
 !
 !-------INITIALIZE IMSLINEAR VARIABLES
       THIS%NITERC = 0
@@ -456,7 +397,7 @@
       THIS%NIAPC = THIS%NEQ
       THIS%NJAPC = THIS%NJA
       ! -- ILUT AND MILUT
-      IF (THIS%IPC.EQ.3 .OR. THIS%IPC.EQ.4) THEN
+      IF (THIS%IPC ==  3 .OR. THIS%IPC ==  4) THEN
         THIS%NIAPC = THIS%NEQ
         IF (THIS%LEVEL > 0) THEN
           iwk      = THIS%NEQ * (THIS%LEVEL * 2 + 1)
@@ -490,7 +431,7 @@
       CALL mem_allocate(THIS%JW, ijw, 'JW', TRIM(THIS%ORIGIN))
       CALL mem_allocate(THIS%WLU, iwlu, 'WLU', TRIM(THIS%ORIGIN))
 !-------GENERATE IAPC AND JAPC FOR ILU0 AND MILU0
-      IF (THIS%IPC.EQ.1 .OR. THIS%IPC.EQ.2) THEN
+      IF (THIS%IPC ==  1 .OR. THIS%IPC ==  2) THEN
         CALL IMSLINEARSUB_PCCRS(THIS%NEQ,THIS%NJA,THIS%IA,THIS%JA,              &
                                 THIS%IAPC,THIS%JAPC)
       END IF
@@ -514,7 +455,7 @@
       CALL mem_allocate(THIS%Z, THIS%NEQ, 'Z', TRIM(THIS%ORIGIN))
 !-------ALLOCATE MEMORY FOR BCGS WORKING ARRAYS
       THIS%NIABCGS = 1
-      IF (THIS%ILINMETH.EQ.2) THEN
+      IF (THIS%ILINMETH ==  2) THEN
         THIS%NIABCGS = THIS%NEQ
       END IF
       CALL mem_allocate(THIS%T, THIS%NIABCGS, 'T', TRIM(THIS%ORIGIN))
@@ -571,7 +512,7 @@
 !
 !-------REVERSE CUTHILL MCKEE AND MINIMUM DEGREE ORDERING
       IF (THIS%IORD.NE.0) THEN
-        CALL IMSLINEARSUB_CALC_ORDER(IOUT,THIS%IPRIMS, THIS%IORD,THIS%NEQ,      &
+        CALL IMSLINEARSUB_CALC_ORDER(IOUT, THIS%IPRIMS, THIS%IORD,THIS%NEQ,     &
                                      THIS%NJA,THIS%IA,THIS%JA,                  &
                                      THIS%LORDER,THIS%IORDER)
       END IF
@@ -583,6 +524,112 @@
       RETURN
     END SUBROUTINE IMSLINEAR_AR
 
+    subroutine imslinear_summary(this, mxiter)
+      class(IMSLINEAR_DATA), intent(inout) :: this
+      integer(I4B), intent(in) :: mxiter
+!     + + + LOCAL VARIABLES + + +
+      CHARACTER (LEN= 10) :: clin(0:2)
+      CHARACTER (LEN= 31) :: clintit(0:2)
+      CHARACTER (LEN= 20) :: cipc(0:4)
+      CHARACTER (LEN= 20) :: cscale(0:2)
+      CHARACTER (LEN= 25) :: corder(0:2)
+      CHARACTER (LEN= 16), DIMENSION(0:4) :: ccnvgopt
+      CHARACTER (LEN= 15) :: clevel
+      CHARACTER (LEN= 15) :: cdroptol 
+      integer(I4B) :: i, j, n
+!     + + + PARAMETERS + + +
+!       DATA
+      DATA clin  /'UNKNOWN   ', &
+                  'CG        ', &
+     &            'BCGS      '/
+      DATA clintit  /'             UNKNOWN           ', &
+                     '       CONJUGATE-GRADIENT      ', &
+     &               'BICONJUGATE-GRADIENT STABILIZED'/
+      DATA cipc  /'UNKNOWN             ', &
+     &            'INCOMPLETE LU       ', &
+     &            'MOD. INCOMPLETE LU  ', &
+     &            'INCOMPLETE LUT      ', &
+     &            'MOD. INCOMPLETE LUT '/
+      DATA cscale/'NO SCALING          ', &
+     &            'SYMMETRIC SCALING   ', &
+     &            'L2 NORM SCALING     '/
+      DATA corder/'ORIGINAL ORDERING        ', &
+     &            'RCM ORDERING             ', &
+     &            'MINIMUM DEGREE ORDERING  '/
+      DATA ccnvgopt  /'INFINITY NORM   ', &
+     &                'INFINITY NORM S ', &
+     &                'L2 NORM         ', &
+     &                'RELATIVE L2NORM ', &
+                      'L2 NORM W. REL. '/
+!       OUTPUT FORMATS
+02010 FORMAT (1X,/,7X,'SOLUTION BY THE',1X,A31,1X,'METHOD', &
+     &        /,1X,66('-'),/, &
+     &        ' MAXIMUM OF ',I6,' CALLS OF SOLUTION ROUTINE',/, &
+     &        ' MAXIMUM OF ',I6, &
+     &        ' INTERNAL ITERATIONS PER CALL TO SOLUTION ROUTINE',/, &
+     &        ' LINEAR ACCELERATION METHOD            =',1X,A,/, &
+     &        ' MATRIX PRECONDITIONING TYPE           =',1X,A,/, &
+     &        ' MATRIX SCALING APPROACH               =',1X,A,/, &
+     &        ' MATRIX REORDERING APPROACH            =',1X,A,/, &
+     &        ' NUMBER OF ORTHOGONALIZATIONS          =',I9,/, &
+     &        ' HEAD CHANGE CRITERION FOR CLOSURE     =',E15.5,/, &
+     &        ' RESIDUAL CHANGE CRITERION FOR CLOSURE =',E15.5,/, &
+     &        ' RESIDUAL CONVERGENCE OPTION           =',I9,/, &
+     &        ' RESIDUAL CONVERGENCE NORM             =',1X,A,/, &
+     &        ' RELAXATION FACTOR                     =',E15.5)
+02015 FORMAT (' NUMBER OF LEVELS                      =',A15,/, &
+     &        ' DROP TOLERANCE                        =',A15,//)
+2030  FORMAT(1X,A20,1X,6(I6,1X))
+2040  FORMAT(1X,20('-'),1X,6(6('-'),1X))
+2050  FORMAT(1X,62('-'),/)      !
+!------------------------------------------------------------------
+      !
+      ! -- initialize clevel and cdroptol
+      clevel = ''
+      cdroptol = ''
+      !
+      ! -- PRINT MXITER,ITER1,IPC,ISCL,IORD,HCLOSE,RCLOSE
+      write (this%iout,2010)                                        &
+                        clintit(THIS%ILINMETH), MXITER, THIS%ITER1, &
+                        clin(THIS%ILINMETH), cipc(THIS%IPC),        &
+                        cscale(THIS%ISCL), corder(THIS%IORD),       &
+                        THIS%NORTH, THIS%HCLOSE, THIS%RCLOSE,       &
+                        THIS%ICNVGOPT, ccnvgopt(THIS%ICNVGOPT),     &
+                        THIS%RELAX
+      if (this%level > 0) then
+        write (clevel, '(i15)') this%level
+      end if
+      if (this%droptol > DZERO) then
+        write (cdroptol, '(e15.5)') this%droptol
+      end if
+      IF (this%level > 0 .or. this%droptol > DZERO) THEN
+        write (this%iout,2015) trim(adjustl(clevel)),               &
+                               trim(adjustl(cdroptol))
+      ELSE
+         WRITE (this%iout,'(//)')
+      END IF
+      
+      if (this%iord /= 0) then
+        !                                                                       
+        ! -- WRITE SUMMARY OF REORDERING INFORMATION TO LIST FILE                                                  
+        if (this%iprims ==  2) then 
+          DO i = 1, this%neq, 6 
+            WRITE (this%iout,2030) 'ORIGINAL NODE      :',                      &
+                              (j,j=i,MIN(i+5,this%neq))                      
+            WRITE (this%iout,2040) 
+            WRITE (this%iout,2030) 'REORDERED INDEX    :',                      &
+                              (this%lorder(j),j=i,MIN(i+5,this%neq))              
+            WRITE (this%iout,2030) 'REORDERED NODE     :',                      &
+                              (this%iorder(j),j=i,MIN(i+5,this%neq))              
+            WRITE (this%iout,2050) 
+          END DO 
+        END IF 
+      end if
+      !
+      ! -- return
+    return
+    end subroutine imslinear_summary 
+    
     subroutine allocate_scalars(this)
       use MemoryManagerModule, only: mem_allocate
       class(IMSLINEAR_DATA), intent(inout) :: this
@@ -731,7 +778,7 @@
           THIS%IORD = 0
           THIS%HCLOSE = DEM3
           THIS%RCLOSE = DEM1
-          THIS%RELAX = 0.0D0
+          THIS%RELAX = DZERO
           THIS%LEVEL = 0
           THIS%DROPTOL = DZERO
           THIS%NORTH = 0
@@ -757,7 +804,7 @@
           THIS%IORD = 0
           THIS%HCLOSE = DEM1
           THIS%RCLOSE = DEM1
-          THIS%RELAX = 0.0D0
+          THIS%RELAX = DZERO
           THIS%LEVEL = 5
           THIS%DROPTOL = DEM4
           THIS%NORTH = 2
@@ -813,13 +860,13 @@
 !     + + + CODE + + +
 !
 !-------SET EPFACT BASED ON MFUSG TIMESTEP
-      IF (THIS%ICNVGOPT.EQ.2) THEN
-        IF (KSTP.EQ.1) THEN
+      IF (THIS%ICNVGOPT ==  2) THEN
+        IF (KSTP ==  1) THEN
           THIS%EPFACT = 0.01
         ELSE
           THIS%EPFACT = 0.10
         END IF
-      ELSE IF (THIS%ICNVGOPT.EQ.4) THEN
+      ELSE IF (THIS%ICNVGOPT ==  4) THEN
         THIS%EPFACT = DEM4
       ELSE
         THIS%EPFACT = DONE
@@ -855,7 +902,7 @@
                             THIS%LEVEL, THIS%DROPTOL, THIS%NJLU, THIS%NJW,      &
                             THIS%NWLU, THIS%JLU, THIS%JW, THIS%WLU)
 !-------INITIALIZE SOLUTION VARIABLE AND ARRAYS
-      IF (KITER.EQ.1 ) THIS%NITERC = 0
+      IF (KITER ==  1 ) THIS%NITERC = 0
       irc    = 1
       ICNVG  = 0
       DO n = 1, THIS%NEQ
@@ -872,18 +919,18 @@
       DO n = 1, THIS%NEQ
         tv   = THIS%D(n)
         THIS%D(n) = THIS%RHS(n) - tv
-        IF (ABS( THIS%D(n) ).GT.rmax ) rmax = ABS( THIS%D(n) )
+        IF (ABS( THIS%D(n) ) > rmax ) rmax = ABS( THIS%D(n) )
         THIS%L2NORM0 = THIS%L2NORM0 + THIS%D(n) * THIS%D(n)
       END DO
       THIS%L2NORM0 = SQRT(THIS%L2NORM0)
 !-------CHECK FOR EXACT SOLUTION
       itmax = THIS%ITER1
-      IF (rmax.EQ.DZERO) THEN
+      IF (rmax ==  DZERO) THEN
         itmax = 0
         ICNVG = 1
       END IF
 !-------SOLUTION BY THE CONJUGATE GRADIENT METHOD
-      IF (THIS%ILINMETH.EQ.1) THEN
+      IF (THIS%ILINMETH ==  1) THEN
         CALL IMSLINEARSUB_CG(ICNVG, itmax, innerit,                             &
                              THIS%NEQ, THIS%NJA, THIS%NIAPC, THIS%NJAPC,        &
                              THIS%IPC, THIS%NITERC, THIS%ICNVGOPT, THIS%NORTH,  &
@@ -896,7 +943,7 @@
                              CACCEL, ITINNER, CONVLOCDV, CONVLOCDR,             &
                              DVMAX, DRMAX, CONVDVMAX, CONVDRMAX)
 !-------SOLUTION BY THE BICONJUGATE GRADIENT STABILIZED METHOD
-      ELSE IF (THIS%ILINMETH.EQ.2) THEN
+      ELSE IF (THIS%ILINMETH ==  2) THEN
         CALL IMSLINEARSUB_BCGS(ICNVG, itmax, innerit,                           &
                                THIS%NEQ, THIS%NJA, THIS%NIAPC, THIS%NJAPC,      &
                                THIS%IPC, THIS%NITERC, THIS%ICNVGOPT, THIS%NORTH,&
@@ -966,9 +1013,6 @@
 !       + + + PARAMETERS + + +                                            
 !       + + + FUNCTIONS + + +                                             
 !       + + + FORMATS + + +                                               
- 2030 FORMAT(1X,A20,1X,6(I6,1X)) 
- 2040 FORMAT(1X,20('-'),1X,6(6('-'),1X)) 
- 2050 FORMAT(1X,62('-'),/) 
 !       + + + CODE + + +                                                  
         DO n = 1, NEQ 
           LORDER(n) = IZERO 
@@ -997,21 +1041,7 @@
         DO n = 1, NEQ 
           IORDER( LORDER(n) ) = n 
         END DO 
-!                                                                       
-!         WRITE SUMMARY OF REORDERING INFORMATION                       
-!         TO LIST FILE                                                  
-        IF (IPRIMS.EQ.2) THEN 
-          DO i = 1, NEQ, 6 
-            WRITE (IOUT,2030) 'ORIGINAL NODE      :',                   &
-     &                        (j,j=i,MIN(i+5,NEQ))                      
-            WRITE (IOUT,2040) 
-            WRITE (IOUT,2030) 'REORDERED INDEX    :',                   &
-     &                        (LORDER(j),j=i,MIN(i+5,NEQ))              
-            WRITE (IOUT,2030) 'REORDERED NODE     :',                   &
-     &                        (IORDER(j),j=i,MIN(i+5,NEQ))              
-            WRITE (IOUT,2050) 
-         END DO 
-         END IF 
+!
 !         DEALLOCATE TEMPORARY STORAGE                                  
         DEALLOCATE ( iwork0, iwork1 ) 
 !
@@ -1050,14 +1080,14 @@
 !       + + + CODE + + +                                                  
 !                                                                       
 !---------SCALE SCALE AMAT, X, AND B                                    
-        IF (IOPT.EQ.0) THEN 
+        IF (IOPT ==  0) THEN 
 !-----------SYMMETRIC SCALING                                           
           SELECT CASE ( ISCL ) 
             CASE ( 1 ) 
               DO n = 1, NEQ 
                 id   = IA(n) 
                 v    = AMAT(id) 
-                c1   = 1.0D0 / SQRT( ABS( v ) ) 
+                c1   = DONE / SQRT( ABS( v ) ) 
                 DSCALE(n)  = c1 
                 DSCALE2(n) = c1 
               END DO 
@@ -1076,17 +1106,17 @@
             CASE ( 2 ) 
 !               SCALE EACH ROW SO THAT THE L-2 NORM IS 1                
               DO n = 1, NEQ 
-                c1 = 0.0D0 
+                c1 = DZERO 
                 i0 = IA(n) 
                 i1 = IA(n+1) - 1 
                 DO i = i0, i1 
                   c1 = c1 + AMAT(i) * AMAT(i) 
                 END DO 
                 c1 = SQRT( c1 ) 
-                IF (c1.EQ.0.0D0) THEN 
-                  c1 = 1.0D0 
+                IF (c1 ==  DZERO) THEN 
+                  c1 = DONE 
                 ELSE 
-                  c1 = 1.0D0 / c1 
+                  c1 = DONE / c1 
                 END IF 
                 DSCALE(n) = c1 
 !                 INITIAL SCALING OF AMAT -- AMAT = DSCALE(row) * AMAT(i)
@@ -1096,9 +1126,9 @@
               END DO 
 !               SCALE EACH COLUMN SO THAT THE L-2 NORM IS 1             
               DO n = 1, NEQ 
-                DSCALE2(n) = 0.0D0 
+                DSCALE2(n) = DZERO 
               END DO 
-              c2 = 0.0D0 
+              c2 = DZERO 
               DO n = 1, NEQ 
                 i0 = IA(n) 
                 i1 = IA(n+1) - 1 
@@ -1110,10 +1140,10 @@
               END DO 
               DO n = 1, NEQ 
                 c2 = DSCALE2(n) 
-                IF (c2.EQ.0.0D0) THEN 
-                  c2 = 1.0D0 
+                IF (c2 ==  DZERO) THEN 
+                  c2 = DONE 
                 ELSE 
-                  c2 = 1.0D0 / SQRT( c2 ) 
+                  c2 = DONE / SQRT( c2 ) 
                 END IF 
                 DSCALE2(n) = c2 
               END DO 
@@ -1145,7 +1175,7 @@
             DO i = i0, i1 
               jc = JA(i) 
               c2 = DSCALE2(jc) 
-              AMAT(i) = ( 1.0D0 / c1 ) * AMAT(i) * ( 1.0D0 / c2 ) 
+              AMAT(i) = ( DONE / c1 ) * AMAT(i) * ( DONE / c2 ) 
             END DO 
 !             UNSCALE X AND B                                           
             c2   = DSCALE2(n) 
@@ -1204,7 +1234,7 @@
      &          /,' ADDING SMALL VALUE TO PIVOT (IMSLINEARSUB_PCU)')           
 !       + + + CODE + + +                                                  
         izero = 0 
-        delta = 0.0D0 
+        delta = DZERO 
         PCSCALE: DO
           SELECT CASE(IPC) 
 !             ILU0 AND MILU0                                              
@@ -1230,14 +1260,14 @@
             CASE DEFAULT
               izero = 0
           END SELECT
-          IF (izero.LT.1) THEN 
+          IF (izero < 1) THEN 
             EXIT PCSCALE 
           END IF 
           delta = 1.5D0 * delta + 0.001 
           izero = 0 
-          IF (delta.GT.0.5D0) THEN 
+          IF (delta > DHALF) THEN 
             WRITE(IOUT,2000) 
-            delta = 0.5D0 
+            delta = DHALF 
             izero = 2 
           END IF
         END DO PCSCALE
@@ -1267,13 +1297,13 @@
             ic1 = IA(n+1) - 1 
             id = IA(n) 
             DO i = ic0, ic1 
-              IF (JA(i).EQ.n) THEN 
+              IF (JA(i) ==  n) THEN 
                 id = i 
                 EXIT 
               END IF 
             END DO 
             tv  = AMAT(id) 
-            IF (ABS( tv ).GT.DZERO ) tv = DONE / tv 
+            IF (ABS( tv ) > DZERO ) tv = DONE / tv 
             APC(n) = tv 
         END DO 
 !---------RETURN                                                        
@@ -1377,7 +1407,7 @@
           IF (sd1.NE.d) THEN 
 !             USE SMALL VALUE IF DIAGONAL SCALING IS NOT EFFECTIVE FOR
 !             PIVOTS THAT CHANGE THE SIGN OF THE DIAGONAL               
-            IF (IZERO.GT.1) THEN 
+            IF (IZERO > 1) THEN 
               tl = SIGN(DEM6,d) 
 !             DIAGONAL SCALING CONTINUES TO BE EFFECTIVE                
             ELSE 
@@ -1385,10 +1415,10 @@
               EXIT MAIN 
             END IF 
           END IF 
-          IF (ABS(tl).EQ.DZERO) THEN 
+          IF (ABS(tl) ==  DZERO) THEN 
 !             USE SMALL VALUE IF DIAGONAL SCALING IS NOT EFFECTIVE FOR
 !             ZERO PIVOTS                                               
-            IF (IZERO.GT.1) THEN 
+            IF (IZERO > 1) THEN 
               tl = SIGN(DEM6,d) 
 !             DIAGONAL SCALING CONTINUES TO BE EFFECTIVE FOR ELIMINATING 
             ELSE 
@@ -1521,10 +1551,10 @@
         real(DP), DIMENSION(CONVNMOD, NCONV), INTENT(INOUT) :: CONVDRMAX
 !       + + + LOCAL DEFINITIONS + + + 
         LOGICAL :: LORTH
+        logical :: lsame 
         character(len=31) :: cval
         integer(I4B) :: n 
         integer(I4B) :: iiter 
-        integer(I4B) :: isame 
         integer(I4B) :: xloc, rloc
         integer(I4B) :: im, im0, im1
         real(DP) :: tv 
@@ -1558,7 +1588,7 @@
           END SELECT 
           rho = IMSLINEARSUB_DP(NEQ, D, Z) 
 !-----------COMPUTE DIRECTIONAL VECTORS                                 
-          IF (IITER.EQ.1) THEN 
+          IF (IITER ==  1) THEN 
             DO n = 1, NEQ 
               P(n) = Z(n) 
             END DO 
@@ -1608,7 +1638,7 @@
             tv      = D(n) 
             tv      = tv - alpha * Q(n) 
             D(n)  = tv 
-            IF (ABS(tv).GT.ABS(rmax)) THEN
+            IF (ABS(tv) > ABS(rmax)) THEN
               rmax = tv
               rloc = n
             END IF
@@ -1633,7 +1663,7 @@
             END DO
           END IF
 !-----------TEST FOR SOLVER CONVERGENCE                                 
-          IF (ICNVGOPT.EQ.2 .OR. ICNVGOPT.EQ.3 .OR. ICNVGOPT.EQ.4) THEN 
+          IF (ICNVGOPT ==  2 .OR. ICNVGOPT ==  3 .OR. ICNVGOPT ==  4) THEN 
             rcnvg = l2norm 
           ELSE 
             rcnvg = rmax 
@@ -1643,11 +1673,11 @@
                                      L2NORM0, EPFACT, HCLOSE, RCLOSE)         
 !
 !           CHECK FOR EXACT SOLUTION                                    
-          IF (rcnvg.EQ.DZERO) ICNVG = 1 
+          IF (rcnvg ==  DZERO) ICNVG = 1 
           IF (ICNVG.NE.0) EXIT INNER 
 !-----------CHECK THAT CURRENT AND PREVIOUS rho ARE DIFFERENT           
-          isame = IMSLINEARSUB_SAME(rho, rho0) 
-          IF (isame.NE.0) THEN 
+          lsame = IS_SAME(rho, rho0) 
+          IF (lsame) THEN 
             EXIT INNER 
           END IF 
 !-----------RECALCULATE THE RESIDUAL
@@ -1662,7 +1692,7 @@
           rho0 = rho 
         END DO INNER 
 !---------RESET ICNVG        
-        IF (ICNVG.LT.0) ICNVG = 0
+        IF (ICNVG < 0) ICNVG = 0
 !---------RETURN                                                        
         RETURN 
       END SUBROUTINE IMSLINEARSUB_CG 
@@ -1733,10 +1763,10 @@
         real(DP), DIMENSION(CONVNMOD, NCONV), INTENT(INOUT) :: CONVDRMAX
 !       + + + LOCAL DEFINITIONS + + +  
         LOGICAL :: LORTH
+        logical :: lsame 
         character(len=15) :: cval1, cval2
         integer(I4B) :: n 
         integer(I4B) :: iiter 
-        integer(I4B) :: isame 
         integer(I4B) :: xloc, rloc
         integer(I4B) :: im, im0, im1
         real(DP) :: tv 
@@ -1775,7 +1805,7 @@
 !----------CALCULATE rho                                                
           rho = IMSLINEARSUB_DP(NEQ, DHAT, D) 
 !-----------COMPUTE DIRECTIONAL VECTORS                                 
-          IF (IITER.EQ.1) THEN 
+          IF (IITER ==  1) THEN 
             DO n = 1, NEQ 
               P(n) = D(n) 
             END DO 
@@ -1811,7 +1841,7 @@
 !          DO n = 1, NEQ 
 !              tv = Q(n) 
 !              IF (ISCL.NE.0 ) tv = tv / DSCALE(n) 
-!              IF (ABS(tv).GT.ABS(rmax) ) rmax = tv 
+!              IF (ABS(tv) > ABS(rmax) ) rmax = tv 
 !          END DO 
 !          IF (ABS(rmax).LE.DPREC) THEN 
 !            deltax = DZERO 
@@ -1821,7 +1851,7 @@
 !                tv = tv * DSCALE(n) 
 !              END IF 
 !              X(n)  = X(n) + tv 
-!              IF (ABS(tv).GT.ABS(deltax) ) deltax = tv 
+!              IF (ABS(tv) > ABS(deltax) ) deltax = tv 
 !            END DO 
 !            CALL IMSLINEARSUB_TESTCNVG(ICNVGOPT, ICNVG, INNERIT,                &
 !                                       deltax, rmax,                            &
@@ -1868,7 +1898,7 @@
             IF (ISCL.NE.0) THEN 
               tv = tv * DSCALE(n) 
             END IF 
-            IF (ABS(tv).GT.ABS(deltax)) THEN
+            IF (ABS(tv) > ABS(deltax)) THEN
               deltax = tv
               xloc = n
             END IF
@@ -1882,7 +1912,7 @@
             IF (ISCL.NE.0) THEN 
               tv = tv / DSCALE(n) 
             END IF 
-            IF (ABS(tv).GT.ABS(rmax)) THEN
+            IF (ABS(tv) > ABS(rmax)) THEN
               rmax = tv
               rloc = n
             END IF
@@ -1908,7 +1938,7 @@
             END DO
           END IF
 !-----------TEST FOR SOLVER CONVERGENCE                                 
-          IF (ICNVGOPT.EQ.2 .OR. ICNVGOPT.EQ.3 .OR. ICNVGOPT.EQ.4) THEN 
+          IF (ICNVGOPT ==  2 .OR. ICNVGOPT ==  3 .OR. ICNVGOPT ==  4) THEN 
             rcnvg = l2norm 
           ELSE 
             rcnvg = rmax 
@@ -1917,20 +1947,20 @@
                                      deltax, rcnvg,                             &
                                      L2NORM0, EPFACT, HCLOSE, RCLOSE)         
 !           CHECK FOR EXACT SOLUTION                                    
-          IF (rcnvg.EQ.DZERO) ICNVG = 1 
+          IF (rcnvg ==  DZERO) ICNVG = 1 
           IF (ICNVG.NE.0) EXIT INNER
 !-----------CHECK THAT CURRENT AND PREVIOUS rho, alpha, AND omega ARE 
 !           DIFFERENT
-          isame = IMSLINEARSUB_SAME(rho, rho0) 
-          IF (isame.NE.0) THEN 
+          lsame = IS_SAME(rho, rho0) 
+          IF (lsame) THEN 
             EXIT INNER 
           END IF 
-          isame = IMSLINEARSUB_SAME(alpha, alpha0) 
-          IF (isame.NE.0) THEN 
+          lsame = IS_SAME(alpha, alpha0) 
+          IF (lsame) THEN 
             EXIT INNER 
           END IF 
-          isame = IMSLINEARSUB_SAME(omega, omega0) 
-          IF (isame.NE.0) THEN 
+          lsame = IS_SAME(omega, omega0) 
+          IF (lsame) THEN 
             EXIT INNER 
           END IF 
 !-----------RECALCULATE THE RESIDUAL
@@ -1951,7 +1981,7 @@
           omega0 = omega
         END DO INNER
 !---------RESET ICNVG        
-        IF (ICNVG.LT.0) ICNVG = 0
+        IF (ICNVG < 0) ICNVG = 0
 !---------RETURN                                                        
         RETURN 
       END SUBROUTINE IMSLINEARSUB_BCGS 
@@ -1974,31 +2004,31 @@
 !       + + + LOCAL DEFINITIONS + + +                                     
 !       + + + FUNCTIONS + + +                                             
 !       + + + CODE + + +                                                  
-        IF (Icnvgopt.EQ.0) THEN 
-          IF (ABS(Hmax).LE.Hclose .AND. ABS(Rmax).LE.Rclose) THEN 
+        IF (Icnvgopt ==  0) THEN 
+          IF (ABS(Hmax) <=  Hclose .AND. ABS(Rmax) <=  Rclose) THEN 
             Icnvg = 1 
           END IF 
-        ELSE IF (Icnvgopt.EQ.1) THEN 
-          IF (ABS(Hmax).LE.Hclose .AND. ABS(Rmax).LE.Rclose .AND.               &
-              iiter.EQ.1) THEN 
+        ELSE IF (Icnvgopt ==  1) THEN 
+          IF (ABS(Hmax) <=  Hclose .AND. ABS(Rmax) <=  Rclose .AND.               &
+              iiter ==  1) THEN 
             Icnvg = 1 
           END IF 
-        ELSE IF (Icnvgopt.EQ.2) THEN 
-          IF (ABS(Hmax).LE.Hclose .OR. Rmax.LE.Rclose) THEN 
+        ELSE IF (Icnvgopt ==  2) THEN 
+          IF (ABS(Hmax) <=  Hclose .OR. Rmax <=  Rclose) THEN 
             Icnvg = 1 
-          ELSE IF (Rmax.LE.Rmax0*Epfact) THEN 
+          ELSE IF (Rmax <=  Rmax0*Epfact) THEN 
             Icnvg = -1 
           END IF
-        ELSE IF (Icnvgopt.EQ.3) THEN 
-          IF (ABS(Hmax).LE.Hclose) THEN
+        ELSE IF (Icnvgopt ==  3) THEN 
+          IF (ABS(Hmax) <=  Hclose) THEN
             Icnvg = 1 
-          ELSE IF (Rmax.LE.Rmax0*Rclose) THEN  
+          ELSE IF (Rmax <=  Rmax0*Rclose) THEN  
             Icnvg = -1 
           END IF
-        ELSE IF (Icnvgopt.EQ.4) THEN 
-          IF (ABS(Hmax).LE.Hclose .AND. Rmax.LE.Rclose) THEN
+        ELSE IF (Icnvgopt ==  4) THEN 
+          IF (ABS(Hmax) <=  Hclose .AND. Rmax <=  Rclose) THEN
             Icnvg = 1 
-          ELSE IF (Rmax.LE.Rmax0*Epfact) THEN  
+          ELSE IF (Rmax <=  Rmax0*Epfact) THEN  
             Icnvg = -1 
           END IF
        END IF 
@@ -2039,7 +2069,7 @@
           ic = 0 
           DO j = i0, i1 
             jcol = JA(j) 
-            IF (jcol.EQ.n ) CYCLE 
+            IF (jcol ==  n) CYCLE 
             ic = ic + 1 
             iarr(ic) = jcol 
           END DO 
@@ -2060,7 +2090,7 @@
           JAPC(n) = IAPC(n+1) 
           DO j = i0, i1 
             jcol = JAPC(j) 
-            IF (jcol.GT.n) THEN 
+            IF (jcol > n) THEN 
               JAPC(n) = j 
               EXIT 
             END IF 
@@ -2082,7 +2112,7 @@
 !       + + + CODE + + +                                                  
         DO i = 1, NVAL-1 
             DO j = i+1, NVAL 
-                if(IARRAY(i).GT.IARRAY(j)) then 
+                if(IARRAY(i) > IARRAY(j)) then 
                     itemp = IARRAY(j) 
                     IARRAY(j) = IARRAY(i) 
                     IARRAY(i) = itemp 
@@ -2280,40 +2310,6 @@
       !---------return
       return
     END FUNCTION IMSLINEARSUB_RNRM2
-
-    FUNCTION IMSLINEARSUB_SAME(a, b) RESULT(ivalue)
-!     + + + return
-      integer(I4B) :: ivalue
-!     + + + dummy arguments + + +
-      real(DP), intent(in)   :: a
-      real(DP), intent(in)   :: b
-!     + + + local definitions + + +
-      real(DP) :: denom
-      real(DP) :: rdiff
-!     + + + parameters + + +
-!     + + + functions + + +
-!     + + + code + + +
-      ivalue = 0
-      if (a == b) then
-        ivalue = 1
-      else
-        if (abs(b) > abs(a)) then
-          denom = b
-        else
-          denom = a
-          if (abs(denom) == DZERO) then
-            denom = DPREC
-          end if
-        end if
-        rdiff = abs( (a - b) / denom )
-        !if (rdiff <= DEM5) then
-        if (rdiff <= DSAME) then
-          ivalue = 1
-        end if
-      end if
-      !---------return
-      return
-    END FUNCTION IMSLINEARSUB_SAME
 !
 !    
 !-------BEGINNING OF SUBROUTINES FROM OTHER LIBRARIES                   
@@ -2322,7 +2318,7 @@
       !
       !  SPARSKIT VERSION 2 SUBROUTINES INCLUDED INCLUDE:
       !
-      !    1 - ilut
+      !    1 - IMSLINEARSUB_PCMILUT
       !    2 - IMSLINEARSUB_PCMILUT_LUSOL
       !    3 - IMSLINEARSUB_PCMILUT_QSPLIT
       !

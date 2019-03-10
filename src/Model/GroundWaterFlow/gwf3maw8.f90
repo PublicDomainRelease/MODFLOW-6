@@ -58,16 +58,16 @@ module mawmodule
     real(DP), pointer :: shutoffdq => null()
     real(DP), pointer :: shutoffqold => null()
     ! -- vectors
-    integer(I4B), pointer, dimension(:), contiguous :: gwfnodes => NULL()
-    real(DP), pointer, dimension(:), contiguous :: sradius => NULL()
-    real(DP), pointer, dimension(:), contiguous :: hk => NULL()
-    real(DP), pointer, dimension(:), contiguous :: satcond => NULL()
-    real(DP), pointer, dimension(:), contiguous :: simcond => NULL()
-    real(DP), pointer, dimension(:), contiguous :: topscrn => NULL()
-    real(DP), pointer, dimension(:), contiguous :: botscrn => NULL()
+    integer(I4B), dimension(:), pointer, contiguous :: gwfnodes => NULL()
+    real(DP), dimension(:), pointer, contiguous :: sradius => NULL()
+    real(DP), dimension(:), pointer, contiguous :: hk => NULL()
+    real(DP), dimension(:), pointer, contiguous :: satcond => NULL()
+    real(DP), dimension(:), pointer, contiguous :: simcond => NULL()
+    real(DP), dimension(:), pointer, contiguous :: topscrn => NULL()
+    real(DP), dimension(:), pointer, contiguous :: botscrn => NULL()
     ! -- time-series aware data
     ! -- aux data
-    type (MawWellTSType), pointer, dimension(:) :: auxvar => null()
+    type (MawWellTSType), dimension(:), pointer, contiguous :: auxvar => null()
     ! -- pumping rate
     type(MawWellTSType), pointer :: rate => null()
     ! -- well head
@@ -78,10 +78,14 @@ module mawmodule
   public :: maw_create
   !
   type, extends(BndType) :: MawType
+    !
     ! -- scalars
     ! -- characters
-    character(len=16), dimension(:), pointer :: cmawbudget => NULL()
-    character(len=LENAUXNAME), dimension(:), pointer :: cauxcbc => NULL()
+    !
+    character(len=16), dimension(:), pointer, contiguous :: cmawbudget => NULL()
+    character(len=LENAUXNAME), dimension(:), pointer,                           &
+                               contiguous :: cauxcbc => NULL()
+    !
     ! -- integers
     integer(I4B), pointer :: iprhed => null()
     integer(I4B), pointer :: iheadout => null()
@@ -95,35 +99,43 @@ module mawmodule
     integer(I4B), pointer :: ishutoffcnt => NULL()
     integer(I4B), pointer :: ieffradopt => NULL()
     real(DP), pointer :: satomega => null()
+    !
     ! -- for budgets
     integer(I4B), pointer :: bditems => NULL()
+    !
     ! -- for underrelaxation of estimated well q if using shutoff
     real(DP), pointer :: theta => NULL()
     real(DP), pointer :: kappa => NULL()
+    !
     ! -- derived types
     type(BudgetType), pointer :: budget => NULL()
-    type(MawWellType), pointer, dimension(:) :: mawwells => NULL()
+    type(MawWellType), dimension(:), pointer, contiguous :: mawwells => NULL()
+    !
     ! -- pointer to gwf iss and gwf hk
     integer(I4B), pointer :: gwfiss => NULL()
-    real(DP), dimension(:), pointer :: gwfk11 => NULL()
-    real(DP), dimension(:), pointer :: gwfk22 => NULL()
+    real(DP), dimension(:), pointer, contiguous :: gwfk11 => NULL()
+    real(DP), dimension(:), pointer, contiguous :: gwfk22 => NULL()
     integer(I4B), pointer :: gwfik22 => NULL()
-    real(DP), dimension(:), pointer :: gwfsat => NULL()
+    real(DP), dimension(:), pointer, contiguous :: gwfsat => NULL()
+    !
     ! -- arrays for handling the rows added to the solution matrix
-    integer(I4B), pointer, dimension(:)           :: idxlocnode    => null() !map position in global rhs and x array of pack entry
-    integer(I4B), pointer, dimension(:)           :: idxdglo       => null() !map position in global array of package diagonal row entries
-    integer(I4B), pointer, dimension(:)           :: idxoffdglo    => null() !map position in global array of package off diagonal row entries
-    integer(I4B), pointer, dimension(:)           :: idxsymdglo    => null() !map position in global array of package diagonal entries to model rows
-    integer(I4B), pointer, dimension(:)           :: idxsymoffdglo => null() !map position in global array of package off diagonal entries to model rows
-    integer(I4B), pointer, dimension(:)           :: iboundpak     => null() !package ibound
-    real(DP), pointer, dimension(:)  :: xnewpak       => null() !package x vector
-    real(DP), pointer, dimension(:)  :: xoldpak       => null() !package xold vector
-    real(DP), pointer, dimension(:)  :: cterm         => null() !package c vector
+    integer(I4B), dimension(:), pointer, contiguous :: idxlocnode => null()      !map position in global rhs and x array of pack entry
+    integer(I4B), dimension(:), pointer, contiguous :: idxdglo => null()         !map position in global array of package diagonal row entries
+    integer(I4B), dimension(:), pointer, contiguous :: idxoffdglo => null()      !map position in global array of package off diagonal row entries
+    integer(I4B), dimension(:), pointer, contiguous :: idxsymdglo => null()      !map position in global array of package diagonal entries to model rows
+    integer(I4B), dimension(:), pointer, contiguous :: idxsymoffdglo => null()   !map position in global array of package off diagonal entries to model rows
+    integer(I4B), dimension(:), pointer, contiguous :: iboundpak => null()       !package ibound
+    real(DP), dimension(:), pointer, contiguous  :: xnewpak => null()            !package x vector
+    real(DP), dimension(:), pointer, contiguous  :: xoldpak => null()            !package xold vector
+    real(DP), dimension(:), pointer, contiguous  :: cterm => null()              !package c vector
+    !
     ! -- vector data (start of flattening for future removal of MawWellType)
-    character (len=LENBOUNDNAME), dimension(:), pointer :: cmawname => null()
-    integer(I4B), pointer, dimension(:) :: idxmawconn => null()
+    character (len=LENBOUNDNAME), dimension(:), pointer,                        &
+                                  contiguous :: cmawname => null()
+    integer(I4B), dimension(:), pointer, contiguous :: idxmawconn => null()
+    !
     ! -- imap vector
-    integer(I4B), pointer, dimension(:) :: imap       => null()
+    integer(I4B), dimension(:), pointer, contiguous :: imap       => null()
     !
     ! -- maw output data
     real(DP), dimension(:), pointer, contiguous :: qauxcbc => null()
@@ -215,6 +227,7 @@ contains
     packobj%ibcnum = ibcnum
     packobj%ncolbnd = 4
     packobj%iscloc = 0  ! not supported
+    packobj%ictorigin = 'NPF'
     !
     ! -- return
     return
@@ -390,7 +403,7 @@ contains
     integer(I4B) :: itmp
     integer(I4B) :: ierr
     real(DP) :: endtim
-    integer(I4B), dimension(:), pointer :: nboundchk
+    integer(I4B), dimension(:), pointer, contiguous :: nboundchk
     ! -- format
     character(len=*),parameter :: fmthdbot = &
       "('well head (',G0,') must be >= BOTTOM_ELEVATION (',G0',).')"
@@ -621,8 +634,8 @@ contains
     integer(I4B) :: n
     integer(I4B) :: nn
     integer(I4B) :: nn2
-    integer(I4B), dimension(:), pointer :: nboundchk
-    integer(I4B), dimension(:), pointer :: iachk
+    integer(I4B), dimension(:), pointer, contiguous :: nboundchk
+    integer(I4B), dimension(:), pointer, contiguous :: iachk
     
 ! ------------------------------------------------------------------------------
     ! -- format
@@ -989,15 +1002,9 @@ contains
     ! -- qa data
     call this%maw_check_attributes()
     !
-    ! -- set initial pump elevation and calculate the saturated conductance
+    ! -- Calculate the saturated conductance
     do n = 1, this%nmawwells
-      ! -- initial pump elevation is set at the lowest screen elevation
-      this%mawwells(n)%pumpelev = this%mawwells(n)%botscrn(1)
-      do j = 2, this%mawwells(n)%ngwfnodes
-        if (this%mawwells(n)%botscrn(j) < this%mawwells(n)%pumpelev) then
-          this%mawwells(n)%pumpelev = this%mawwells(n)%botscrn(j)
-        end if
-      end do
+      !
       ! -- calculate saturated conductance only if CONDUCTANCE was not
       !    specified for each maw-gwf connection (CONDUCTANCE keyword).
       do j = 1, this%mawwells(n)%ngwfnodes
@@ -1009,7 +1016,6 @@ contains
     end do
     !
     ! -- write summary of static well data
-    ! -- write well data
     ! -- write well data
     write (this%iout,fmtwelln) '  WELL NO.', '    RADIUS', '      AREA', &
                                ' WELL BOT.', '      STRT', ' NGWFNODES', &
@@ -1139,7 +1145,7 @@ contains
       case ('STATUS')
         call urword(line, lloc, istart, istop, 1, ival, rval, this%iout, this%inunit)
         text = line(istart:istop)
-        this%mawwells(imaw)%status = text
+        this%mawwells(imaw)%status = text(1:8)
         if (text == 'CONSTANT') then
           this%iboundpak(imaw) = -1
         else if (text == 'INACTIVE') then
@@ -3179,10 +3185,10 @@ contains
 ! ------------------------------------------------------------------------------
     class(MawType) :: this
     integer(I4B), pointer :: neq
-    integer(I4B), dimension(:), pointer :: ibound
-    real(DP), dimension(:), pointer :: xnew
-    real(DP), dimension(:), pointer :: xold
-    real(DP), dimension(:), pointer :: flowja
+    integer(I4B), dimension(:), pointer, contiguous :: ibound
+    real(DP), dimension(:), pointer, contiguous :: xnew
+    real(DP), dimension(:), pointer, contiguous :: xold
+    real(DP), dimension(:), pointer, contiguous :: flowja
     ! -- local
     integer(I4B) :: n
     integer(I4B) :: istart, iend
@@ -3789,7 +3795,6 @@ contains
     return
   end subroutine maw_calculate_saturation
 
-
   subroutine maw_calculate_wellq(this, n, hmaw, q)
 ! **************************************************************************
 ! maw_calculate_wellq-- Calculate well pumping rate based on constraints
@@ -3811,12 +3816,19 @@ contains
     real(DP) :: dq
 ! --------------------------------------------------------------------------
     !
-    ! -- Initialize accumulators
+    ! -- Initialize q
     q = DZERO
-    ! -- base pumping rate
+    !
+    ! -- Assign rate as the user-provided base pumping rate
     rate = this%mawwells(n)%rate%value
+    !
+    ! -- Assign q differently depending on whether this is an extraction well
+    !    (rate < 0) or an injection well (rate > 0).
     if (rate < DZERO) then
-      !if (this%mawwells(n)%shutoffmin > DZERO) then
+      !
+      ! -- If well shut off is activated, then turn off well if necessary,
+      !    or if shut off is not activated then check to see if rate scaling 
+      !    is on.
       if (this%mawwells(n)%shutofflevel /= DEP20) then
         call this%maw_calculate_qpot(n, q)
         if (q < DZERO) q = DZERO
@@ -3846,6 +3858,9 @@ contains
         this%mawwells(n)%shutoffdq = dq
         this%mawwells(n)%shutoffweight = weight
 
+        !
+        ! -- If shutoffmin and shutoffmax are specified then apply 
+        !    additional checks for when to shut off the well.
         if (this%mawwells(n)%shutoffmin > DZERO) then
           if (hmaw < this%mawwells(n)%shutofflevel) then
             !
@@ -3883,9 +3898,10 @@ contains
 
       else
         scale = DONE
-        ! -- scale pumpage when hmaw is less than the sum of
-        !    maw pump elevation (pumpelev) and the specified reduction length
-        !    Only applied to pumping wells
+        ! -- Apply rate scaling by reducing pumpage when hmaw is less than the 
+        !    sum of maw pump elevation (pumpelev) and the specified reduction 
+        !    length.  The rate will go to zero as hmaw drops to the pump
+        !    elevation.
         if (this%mawwells(n)%reduction_length /= DEP20) then
           bt = this%mawwells(n)%pumpelev
           tp = bt + this%mawwells(n)%reduction_length
@@ -3893,15 +3909,58 @@ contains
         end if
         q = scale * rate
       end if
-    ! -- injection is not rate limited
+    !
     else
+      !
+      ! -- Handle the injection case (rate > 0) differently than extraction.
       q = rate
+      if (this%mawwells(n)%shutofflevel /= DEP20) then
+        call this%maw_calculate_qpot(n, q)
+        q = -q
+        if (q < DZERO) q = DZERO
+        if (q > rate) q = rate
+
+        if (this%ishutoffcnt == 1) then
+          this%mawwells(n)%shutoffweight = DONE
+          this%mawwells(n)%shutoffdq = DZERO
+          this%mawwells(n)%shutoffqold = q
+        end if
+
+        dq = q - this%mawwells(n)%shutoffqold
+        weight = this%mawwells(n)%shutoffweight
+
+        ! -- for flip-flop condition, decrease factor
+        if ( this%mawwells(n)%shutoffdq*dq < DZERO ) then
+          weight = this%theta * this%mawwells(n)%shutoffweight
+        ! -- when change is of same sign, increase factor
+        else
+          weight = this%mawwells(n)%shutoffweight + this%kappa
+        end if
+        if ( weight > DONE ) weight = DONE
+        
+        q = this%mawwells(n)%shutoffqold + weight * dq
+        
+        this%mawwells(n)%shutoffqold = q
+        this%mawwells(n)%shutoffdq = dq
+        this%mawwells(n)%shutoffweight = weight
+        
+      else
+        scale = DONE
+        ! -- Apply rate scaling for an injection well by reducting the 
+        !    injection rate as hmaw rises above the pump elevation.  The rate
+        !    will approach zero as hmaw approaches pumpelev + reduction_length.
+        if (this%mawwells(n)%reduction_length /= DEP20) then
+          bt = this%mawwells(n)%pumpelev
+          tp = bt + this%mawwells(n)%reduction_length
+          scale = DONE - sQSaturation(tp, bt, hmaw)
+        endif
+        q = scale * rate
+      endif
     end if
     !
     ! -- return
     return
   end subroutine maw_calculate_wellq
-
 
   subroutine maw_calculate_qpot(this, n, qnet)
 ! ******************************************************************************

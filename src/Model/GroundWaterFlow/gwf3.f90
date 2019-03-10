@@ -2,7 +2,7 @@ module GwfModule
 
   use KindModule,                  only: DP, I4B
   use InputOutputModule,           only: ParseLine, upcase
-  use ConstantsModule,             only: LENFTYPE, DZERO, DTEN, DEP20
+  use ConstantsModule,             only: LENFTYPE, DZERO, DEM1, DTEN, DEP20
   use NumericalModelModule,        only: NumericalModelType
   use BaseDisModule,               only: DisBaseType
   use BndModule,                   only: BndType, AddBndToList, GetBndFromList
@@ -652,7 +652,7 @@ module GwfModule
     return
   end subroutine gwf_fc
 
-  subroutine gwf_cc(this, kiter, iend, icnvg)
+  subroutine gwf_cc(this, kiter, iend, icnvg, hclose, rclose)
 ! ******************************************************************************
 ! gwf_cc -- GroundWater Flow Model Final Convergence Check for Boundary Packages
 ! Subroutine: (1) calls package cc routines
@@ -665,6 +665,8 @@ module GwfModule
     integer(I4B),intent(in) :: kiter
     integer(I4B),intent(in) :: iend
     integer(I4B),intent(inout) :: icnvg
+    real(DP), intent(in) :: hclose
+    real(DP), intent(in) :: rclose
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
@@ -677,7 +679,7 @@ module GwfModule
     ! -- Call package cc routines
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
-      call packobj%bnd_cc(iend, icnvg)
+      call packobj%bnd_cc(iend, icnvg, hclose, rclose)
     enddo
     !
     ! -- return
@@ -686,7 +688,7 @@ module GwfModule
   
   subroutine gwf_ptcchk(this, iptc)
 ! ******************************************************************************
-! gwf_ptc -- check if pseudo-transient continuation factor should be used
+! gwf_ptcchk -- check if pseudo-transient continuation factor should be used
 ! Subroutine: (1) Check if pseudo-transient continuation factor should be used
 ! ******************************************************************************
 !
@@ -698,17 +700,14 @@ module GwfModule
     integer(I4B), intent(inout) :: iptc
 ! ------------------------------------------------------------------------------
     ! -- determine if pseudo-transient continuation should be applied to this 
-    !    model - pseudo-transient continuation only appled to problems without 
-    !    storage
+    !    model - pseudo-transient continuation only applied to problems that
+    !    use the Newton-Raphson formulation during steady-state stress periods
     iptc = 0
     if (this%iss > 0) then
-      if (this%insto == 0) then
-        ! -- and problems using Newton-Raphson
-        if (this%inewton > 0) then
-          iptc = this%inewton
-        else
-          iptc = this%npf%inewton
-        end if
+      if (this%inewton > 0) then
+        iptc = this%inewton
+      else
+        iptc = this%npf%inewton
       end if
     end if
     !
@@ -746,55 +745,74 @@ module GwfModule
     integer(I4B) :: jcol
     integer(I4B) :: j, jj
     real(DP) :: v
-    real(DP) :: q
+    real(DP) :: resid
+    real(DP) :: ptcdelem1
     real(DP) :: diag
     real(DP) :: diagcnt
     real(DP) :: diagmin
+    real(DP) :: diagmax
 ! ------------------------------------------------------------------------------
     ! -- set temporary flag indicating if pseudo-transient continuation should
     !    be used for this model and time step
     iptct = 0
-    ! -- only apply pseudo-transient continuation for problems without storage
+    ! -- only apply pseudo-transient continuation to problems using the 
+    !    Newton-Raphson formulations for steady-state stress periods
     if (this%iss > 0) then
-      if (this%insto == 0) then
-        ! -- and problems using Newton-Raphson
-        if (this%inewton > 0) then
-          iptct = this%inewton
-        else
-          iptct = this%npf%inewton
-        end if
+      if (this%inewton > 0) then
+        iptct = this%inewton
+      else
+        iptct = this%npf%inewton
       end if
     end if
     !
     ! -- calculate pseudo-transient continuation factor for model
     if (iptct > 0) then
       diagmin = DEP20
+      diagmax = DZERO
       diagcnt = DZERO
       do n = 1, this%dis%nodes
         if (this%npf%ibound(n) < 1) cycle
         jcol = n + this%moffset
-        v = this%dis%get_cell_volume(n, x(jcol))
-        if (v > DZERO) then
-          q = DZERO
-          do j = ia(jcol), ia(jcol+1)-1
-            jj = ja(j)
-            q = q + amatsln(j) * x(jcol)
-          end do
-          q = q - rhs(jcol)
-        else
-          cycle
-        end if
-        q = q / v
-        if (abs(q) > ptcf) ptcf = abs(q)
+        !
+        ! get the maximum volume of the cell (head at top of cell)        
+        v = this%dis%get_cell_volume(n, this%dis%top(n))
+        !
+        ! -- calculate the residual for the cell
+        resid = DZERO
+        do j = ia(jcol), ia(jcol+1)-1
+          jj = ja(j)
+          resid = resid + amatsln(j) * x(jcol)
+        end do
+        resid = resid - rhs(jcol)
+        !
+        ! -- calculate the reciprocal of the pseudo-time step
+        !    resid [L3/T] / volume [L3] = [1/T]
+        ptcdelem1 = abs(resid) / v
+        !
+        ! -- set ptcf if the reciprocal of the pseudo-time step
+        !    exceeds the current value (equivalent to using the 
+        !    smallest pseudo-time step) 
+        if (ptcdelem1 > ptcf) ptcf = ptcdelem1
+        !
+        ! -- determine minimum and maximum diagonal entries
         j = ia(jcol)
         diag = abs(amatsln(j))
         diagcnt = diagcnt + DONE
         if (diag > DZERO) then
           if (diag < diagmin) diagmin = diag
+          if (diag > diagmax) diagmax = diag
         end if
       end do
+      !
+      ! -- set the reciprocal of the pseudo-time step
+      !    to a fraction of the minimum or maximum
+      !    diagonal entry to prevent excessively small
+      !    or large values
       if (diagcnt > DZERO) then
+        diagmin = diagmin * DEM1
+        diagmax = diagmax * DEM1
         if (ptcf < diagmin) ptcf = diagmin
+        if (ptcf > diagmax) ptcf = diagmax
       end if
     end if
 
@@ -1314,7 +1332,6 @@ module GwfModule
     integer(I4B) :: ip
 ! ------------------------------------------------------------------------------
     !
-    ! -- Now supporting new-style WEL and GHB packages.
     ! -- This part creates the package object
     select case(filtyp)
     case('CHD6')
@@ -1345,18 +1362,17 @@ module GwfModule
       call ustop()
     end select
     !
-    ! -- Packages is the bndlist that is associated with the parent model
-    ! -- The following statement puts a pointer to this package in the ipakid
-    ! -- position of packages.
-      do ip = 1, this%bndlist%Count()
-        packobj2 => GetBndFromList(this%bndlist, ip)
-        if(packobj2%name == pakname) then
-          write(errmsg, '(a,a)') 'Cannot create package.  Package name  ' //   &
-            'already exists: ', trim(pakname)
-          call store_error(errmsg)
-          call ustop()
-        endif
-      enddo
+    ! -- Check to make sure that the package name is unique, then store a
+    !    pointer to the package in the model bndlist
+    do ip = 1, this%bndlist%Count()
+      packobj2 => GetBndFromList(this%bndlist, ip)
+      if(packobj2%name == pakname) then
+        write(errmsg, '(a,a)') 'Cannot create package.  Package name  ' //   &
+          'already exists: ', trim(pakname)
+        call store_error(errmsg)
+        call ustop()
+      endif
+    enddo
     call AddBndToList(this%bndlist, packobj)
     !
     ! -- return
@@ -1426,7 +1442,7 @@ module GwfModule
     endif
     if(indis==0) then
       write(errmsg, '(1x,a)') &
-        'ERROR. DISCRETIZATION (DIS6 or DISU6) PACKAGE NOT SPECIFIED.'
+        'ERROR. DISCRETIZATION (DIS6, DISV6, or DISU6) PACKAGE NOT SPECIFIED.'
       call store_error(errmsg)
     endif
     if(this%innpf==0) then

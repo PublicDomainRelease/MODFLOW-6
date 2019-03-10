@@ -20,15 +20,15 @@ module EvtModule
   !
   type, extends(BndType) :: EvtType
     ! -- logicals
-    logical, private               :: segsdefined = .true.
-    logical, private               :: fixed_cell = .false.
-    logical, private               :: read_as_arrays = .false.
-    logical, private               :: surfratespecified = .false.
+    logical, private :: segsdefined = .true.
+    logical, private :: fixed_cell = .false.
+    logical, private :: read_as_arrays = .false.
+    logical, private:: surfratespecified = .false.
     ! -- integers
-    integer(I4B), pointer               :: inievt => null()
-    integer(I4B), pointer, private      :: nseg => null()
+    integer(I4B), pointer :: inievt => null()
+    integer(I4B), pointer, private :: nseg => null()
     ! -- arrays
-    integer(I4B), pointer, dimension(:) :: nodesontop => null()
+    integer(I4B), dimension(:), pointer, contiguous :: nodesontop => null()
   contains
     procedure :: evt_allocate_scalars
     procedure :: bnd_options         => evt_options
@@ -105,6 +105,7 @@ module EvtModule
     packobj%ibcnum = ibcnum
     packobj%ncolbnd = 3 ! Assumes NSEG = 1
     packobj%iscloc = 2  ! sfac applies to max. ET rate
+    packobj%ictorigin = 'NPF'
     ! indxconvertflux is Column index of bound that will be multiplied by
     ! cell area to convert flux rates to flow rates
     packobj%indxconvertflux = 2
@@ -719,11 +720,13 @@ module EvtModule
     integer(I4B) :: indx, ipos
     integer(I4B) :: jcol, jauxcol, lpos, ivarsread
     character(len=LENTIMESERIESNAME) :: tasName
-    character(len=24) ::  atemp
     character(len=24), dimension(6) :: aname
-    character(len=100) :: ermsg, keyword
+    character(len=100) :: ermsg, keyword, atemp
     logical :: found, endOfBlock
     logical :: convertFlux
+    !
+    ! -- these time array series pointers need to be non-contiguous
+    !    beacuse a slice of bound is passed
     real(DP), dimension(:), pointer :: bndArrayPtr => null()
     real(DP), dimension(:), pointer :: auxArrayPtr => null()
     real(DP), dimension(:), pointer :: auxMultArray => null()

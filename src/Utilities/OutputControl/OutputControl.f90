@@ -16,7 +16,7 @@ module OutputControlModule
     integer(I4B), pointer                               :: iout       => null() !unit number for output file
     integer(I4B), pointer                               :: iperoc     => null() !stress period number for next output control
     integer(I4B), pointer                               :: iocrep     => null() !output control repeat flag (period 0 step 0)
-    type(OutputControlDataType), dimension(:), pointer  :: ocdobj     => null() !output control objects
+    type(OutputControlDataType), dimension(:), pointer, contiguous  :: ocdobj     => null() !output control objects
     type(BlockParserType)                               :: parser
   contains
     procedure :: oc_df
@@ -96,7 +96,7 @@ module OutputControlModule
     logical :: isfound, found, endOfBlock
     character(len=LINELENGTH) :: line
     character(len=LINELENGTH) :: ermsg, keyword1, keyword2
-    character(len=5) :: printsave
+    character(len=LINELENGTH) :: printsave
     class(OutputControlDataType), pointer :: ocdobjptr
     ! -- formats
     character(len=*), parameter :: fmtboc =                                    &

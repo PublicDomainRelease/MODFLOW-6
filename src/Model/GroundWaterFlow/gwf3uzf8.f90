@@ -38,22 +38,24 @@ module UzfModule
     integer(I4B), pointer :: iwcontout => null()
     integer(I4B), pointer :: ibudgetout => null()
     !
-    type(BudgetType), pointer                          :: budget      => null() !budget object
-    integer(I4B), pointer                              :: bditems     => null() !number of budget items
-    integer(I4B), pointer                              :: nbdtxt      => null() !number of budget text items
-    character(len=LENBUDTXT), dimension(:), pointer    :: bdtxt       => null() !budget items written to cbc file
-    type(UzfKinematicType), pointer                    :: uzfobj      => null() !uzf kinematic object
-    type(UzfKinematicType), pointer                    :: uzfobjwork  => null() !uzf kinematic work object
-    type(UzfKinematicType), pointer                    :: uzfobjbelow => null() !uzf kinematic object of underlying cell
-    type(UzfKinematicType), pointer, dimension(:)      :: elements    => null() !array of all the kinematic uzf objects
-    character(len=72), pointer                         :: nameuzf     => null() !cdl--(not sure.  Delete?)
+    type(BudgetType), pointer                          :: budget      => null()  !budget object
+    integer(I4B), pointer                              :: bditems     => null()  !number of budget items
+    integer(I4B), pointer                              :: nbdtxt      => null()  !number of budget text items
+    character(len=LENBUDTXT), dimension(:), pointer,                            &
+                              contiguous               :: bdtxt       => null()  !budget items written to cbc file
+    type(UzfKinematicType), pointer                    :: uzfobj      => null()  !uzf kinematic object
+    type(UzfKinematicType), pointer                    :: uzfobjwork  => null()  !uzf kinematic work object
+    type(UzfKinematicType), pointer                    :: uzfobjbelow => null()  !uzf kinematic object of underlying cell
+    type(UzfKinematicType), dimension(:), pointer,                              &
+                            contiguous                 :: elements    => null()  !array of all the kinematic uzf objects
+    character(len=72), pointer                         :: nameuzf     => null()  !cdl--(not sure.  Delete?)
     !
     ! -- pointer to gwf variables
     integer(I4B), pointer                      :: gwfiss      => null()
-    real(DP), dimension(:), pointer            :: gwftop      => null()
-    real(DP), dimension(:), pointer            :: gwfbot      => null()
-    real(DP), dimension(:), pointer            :: gwfarea     => null()
-    real(DP), dimension(:), pointer            :: gwfhcond    => null()
+    real(DP), dimension(:), pointer, contiguous            :: gwftop      => null()
+    real(DP), dimension(:), pointer, contiguous            :: gwfbot      => null()
+    real(DP), dimension(:), pointer, contiguous            :: gwfarea     => null()
+    real(DP), dimension(:), pointer, contiguous            :: gwfhcond    => null()
     !
     ! -- uzf data
     integer(I4B), pointer                       :: ntrail       => null()
@@ -68,21 +70,21 @@ module UzfModule
     integer(I4B), pointer                       :: igwetflag    => null()
     integer(I4B), pointer                       :: iseepflag    => null()
     integer(I4B), pointer                       :: imaxcellcnt  => null()
-    integer(I4B), dimension(:), pointer         :: mfcellid     => null()
-    real(DP), dimension(:), pointer             :: appliedinf   => null()
-    real(DP), dimension(:), pointer             :: rejinf       => null()
-    real(DP), dimension(:), pointer             :: rejinf0      => null()
-    real(DP), dimension(:), pointer             :: rejinftomvr  => null()
-    real(DP), dimension(:), pointer             :: infiltration => null()
-    real(DP), dimension(:), pointer             :: recharge     => null()
-    real(DP), dimension(:), pointer             :: gwet         => null()
-    real(DP), dimension(:), pointer             :: uzet         => null()
-    real(DP), dimension(:), pointer             :: gwd          => null()
-    real(DP), dimension(:), pointer             :: gwd0         => null()
-    real(DP), dimension(:), pointer             :: gwdtomvr     => null()
-    real(DP), dimension(:), pointer             :: rch          => null()
-    real(DP), dimension(:), pointer             :: rch0         => null()
-    real(DP), dimension(:), pointer             :: qsto         => null()
+    integer(I4B), dimension(:), pointer, contiguous         :: mfcellid     => null()
+    real(DP), dimension(:), pointer, contiguous             :: appliedinf   => null()
+    real(DP), dimension(:), pointer, contiguous             :: rejinf       => null()
+    real(DP), dimension(:), pointer, contiguous             :: rejinf0      => null()
+    real(DP), dimension(:), pointer, contiguous             :: rejinftomvr  => null()
+    real(DP), dimension(:), pointer, contiguous             :: infiltration => null()
+    real(DP), dimension(:), pointer, contiguous             :: recharge     => null()
+    real(DP), dimension(:), pointer, contiguous             :: gwet         => null()
+    real(DP), dimension(:), pointer, contiguous             :: uzet         => null()
+    real(DP), dimension(:), pointer, contiguous             :: gwd          => null()
+    real(DP), dimension(:), pointer, contiguous             :: gwd0         => null()
+    real(DP), dimension(:), pointer, contiguous             :: gwdtomvr     => null()
+    real(DP), dimension(:), pointer, contiguous             :: rch          => null()
+    real(DP), dimension(:), pointer, contiguous             :: rch0         => null()
+    real(DP), dimension(:), pointer, contiguous             :: qsto         => null()
     integer(I4B), pointer                       :: iuzf2uzf     => null()
     !
     ! -- integer vectors
@@ -90,21 +92,21 @@ module UzfModule
     integer(I4B), dimension(:), pointer, contiguous :: ja => null()
     !
     ! -- timeseries aware variables
-    type (MemoryTSType), pointer, dimension(:) :: sinf => null()
-    type (MemoryTSType), pointer, dimension(:) :: pet => null()
-    type (MemoryTSType), pointer, dimension(:) :: extdp => null()
-    type (MemoryTSType), pointer, dimension(:) :: extwc => null()
-    type (MemoryTSType), pointer, dimension(:) :: ha => null()
-    type (MemoryTSType), pointer, dimension(:) :: hroot => null()
-    type (MemoryTSType), pointer, dimension(:) :: rootact => null()
-    type (MemoryTSType), pointer, dimension(:) :: lauxvar => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: sinf => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: pet => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: extdp => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: extwc => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: ha => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: hroot => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: rootact => null()
+    type (MemoryTSType), dimension(:), pointer, contiguous :: lauxvar => null()
     !
     ! -- convergence check
     integer(I4B), pointer  :: iconvchk    => null()
-    real(DP), pointer      :: pdmax    => null()
+    !real(DP), pointer      :: pdmax    => null()
     !
     ! formulate variables
-    real(DP), dimension(:), pointer            :: deriv       => null()
+    real(DP), dimension(:), pointer, contiguous            :: deriv       => null()
     !
     ! budget variables
     real(DP), pointer                          :: totfluxtot  => null()
@@ -119,13 +121,13 @@ module UzfModule
     !
     ! -- uzf cbc budget items
     integer(I4B), pointer :: cbcauxitems => NULL()
-    character(len=16), dimension(:), pointer :: cauxcbc => NULL()
+    character(len=16), dimension(:), pointer, contiguous :: cauxcbc => NULL()
     real(DP), dimension(:), pointer, contiguous :: qauxcbc => null()
     !
     ! -- observations
-    real(DP), dimension(:), pointer            :: obs_theta   => null()
-    real(DP), dimension(:), pointer            :: obs_depth   => null()
-    integer(I4B), dimension(:), pointer        :: obs_num     => null()
+    real(DP), dimension(:), pointer, contiguous            :: obs_theta   => null()
+    real(DP), dimension(:), pointer, contiguous            :: obs_depth   => null()
+    integer(I4B), dimension(:), pointer, contiguous        :: obs_num     => null()
 
   contains
 
@@ -206,6 +208,7 @@ contains
     packobj%ibcnum = ibcnum
     packobj%ncolbnd = 1
     packobj%iscloc = 0  ! not supported
+    packobj%ictorigin = 'NPF'
     !
     ! -- return
     return
@@ -518,17 +521,17 @@ contains
      &    'A FINAL CONVERGENCE CHECK OF THE CHANGE IN UZF RECHARGE ' //        &
      &    'WILL NOT BE MADE'
         found = .true.
-      case('DEV_MAXIMUM_PERCENT_DIFFERENCE')
-        call this%parser%DevOpt()
-        r = this%parser%GetDouble()
-        if (r > DZERO) then
-          this%pdmax = r
-          write(this%iout, fmtuzfopt) 'MAXIMUM_PERCENT_DIFFERENCE', this%pdmax
-        else
-          write(this%iout, fmtuzfopt) 'INVALID MAXIMUM_PERCENT_DIFFERENCE', r
-          write(this%iout, fmtuzfopt) 'USING DEFAULT MAXIMUM_PERCENT_DIFFERENCE', this%pdmax
-        end if
-        found = .true.
+      !case('DEV_MAXIMUM_PERCENT_DIFFERENCE')
+      !  call this%parser%DevOpt()
+      !  r = this%parser%GetDouble()
+      !  if (r > DZERO) then
+      !    this%pdmax = r
+      !    write(this%iout, fmtuzfopt) 'MAXIMUM_PERCENT_DIFFERENCE', this%pdmax
+      !  else
+      !    write(this%iout, fmtuzfopt) 'INVALID MAXIMUM_PERCENT_DIFFERENCE', r
+      !    write(this%iout, fmtuzfopt) 'USING DEFAULT MAXIMUM_PERCENT_DIFFERENCE', this%pdmax
+      !  end if
+      !  found = .true.
      case default
     ! -- No options found
         found = .false.
@@ -1136,7 +1139,7 @@ contains
     return
   end subroutine uzf_fn
 
-  subroutine uzf_cc(this, iend, icnvg)
+  subroutine uzf_cc(this, iend, icnvg, hclose, rclose)
 ! **************************************************************************
 ! uzf_cc -- Final convergence check for package
 ! **************************************************************************
@@ -1148,6 +1151,8 @@ contains
     class(Uzftype), intent(inout) :: this
     integer(I4B), intent(in) :: iend
     integer(I4B), intent(inout) :: icnvg
+    real(DP), intent(in) :: hclose
+    real(DP), intent(in) :: rclose
     ! -- local
     character(len=LINELENGTH) :: line, linesep
     character(len=16) :: text
@@ -1181,6 +1186,7 @@ contains
         if (avgrch > DZERO) then
           pdrch = DHUNDRED * drch / avgrch
         end if
+        dseep = DZERO
         avgseep = DZERO
         if (this%iseepflag == 1) then
           dseep = this%gwd0(n) - this%gwd(n)
@@ -1190,7 +1196,9 @@ contains
         if (avgseep > DZERO) then
           pdseep = DHUNDRED * dseep / avgseep
         end if
-        if (ABS(pdrejinf) > this%pdmax .or. ABS(pdrch) > this%pdmax .or. ABS(pdseep) > this%pdmax) then
+        !if (ABS(pdrejinf) > this%pdmax .or. ABS(pdrch) > this%pdmax .or. ABS(pdseep) > this%pdmax) then
+        if (ABS(drejinf) > rclose .or. ABS(drch) > rclose .or.                  &
+            ABS(dseep) > rclose) then
           icnvg = 0
           ! write convergence check information if this is the last outer iteration
           if (iend == 1) then
@@ -1209,7 +1217,7 @@ contains
                 call UWWORD(line, iloc, 15, 1, 'gwf seepage', n, r, CENTER=.TRUE., sep=' ')
                 call UWWORD(line, iloc, 15, 1, 'gwf seepage', n, r, CENTER=.TRUE., sep=' ')
               end if
-              call UWWORD(line, iloc, 15, 1, 'pct difference', n, r, CENTER=.TRUE.)
+              call UWWORD(line, iloc, 15, 1, 'closure', n, r, CENTER=.TRUE.)
               ! -- create line separator
               linesep = repeat('-', iloc)
               ! -- write first line
@@ -1245,7 +1253,7 @@ contains
               call UWWORD(line, iloc, 15, 3, text, n, dseep, sep=' ')
               call UWWORD(line, iloc, 15, 3, text, n, pdseep, sep=' ')
             end if
-            call UWWORD(line, iloc, 15, 3, text, n, this%pdmax)
+            call UWWORD(line, iloc, 15, 3, text, n, rclose)
             write(this%iout, '(1X,A)') line(1:iloc)
           else
             exit final_check
@@ -1417,7 +1425,7 @@ contains
                               qgwformvr,sumaet,ierr)
       if ( ierr > 0 ) then
         if ( ierr == 1 ) &
-          msg = 'Error: UZF variable NWAVSETS needs to be increased.'
+          msg = 'Error: UZF variable NWAVESETS needs to be increased.'
         call store_error(msg)
         call ustop()
       end if
@@ -2303,7 +2311,7 @@ contains
                                     qfrommvr,qformvr,ierr,sumaet,ivertflag)
         if ( ierr > 0 ) then
             if ( ierr == 1 ) &
-              msg = 'Error: UZF variable NWAVSETS needs to be increased '
+              msg = 'Error: UZF variable NWAVESETS needs to be increased '
             call store_error(msg)
             call ustop()
         end if
@@ -3335,7 +3343,7 @@ contains
     call mem_allocate(this%cbcauxitems, 'CBCAUXITEMS', this%origin)
 
     call mem_allocate(this%iconvchk, 'ICONVCHK', this%origin)
-    call mem_allocate(this%pdmax, 'PDMAX', this%origin)
+    !call mem_allocate(this%pdmax, 'PDMAX', this%origin)
     !
     ! -- initialize scalars
     this%iprwcont = 0
@@ -3361,7 +3369,7 @@ contains
     !
     ! -- convergence check
     this%iconvchk = 1
-    this%pdmax = DEM1
+    !this%pdmax = DEM1
     !
     ! -- return
     return
@@ -3430,7 +3438,7 @@ contains
     !
     ! -- convergence check
     call mem_deallocate(this%iconvchk)
-    call mem_deallocate(this%pdmax)
+    !call mem_deallocate(this%pdmax)
     !
     ! -- deallocate arrays
     call mem_deallocate(this%mfcellid)
