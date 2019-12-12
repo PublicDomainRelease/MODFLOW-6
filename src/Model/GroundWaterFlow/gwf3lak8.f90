@@ -527,7 +527,8 @@ contains
     !
     ! -- read lake well data
     ! -- get lakes block
-    call this%parser%GetBlock('PACKAGEDATA', isfound, ierr, supportOpenClose=.true.)
+    call this%parser%GetBlock('PACKAGEDATA', isfound, ierr, &
+      supportOpenClose=.true.)
     !
     ! -- parse locations block if detected
     if (isfound) then
@@ -1396,10 +1397,10 @@ contains
           !
           ! -- read outlet lakein
           ival = this%parser%GetInteger()
-          if (ival <1 .or. ival > this%noutlets) then
+          if (ival <1 .or. ival > this%nlakes) then
             write(errmsg,'(4x,a,1x,i4,1x,a,1x,i6)') &
               '****ERROR. lakein FOR OUTLET ', n, 'MUST BE > 0 and <= ',        &
-              this%noutlets
+              this%nlakes
             call store_error(errmsg)
             cycle readoutlet
           end if
@@ -1410,7 +1411,7 @@ contains
           if (ival <0 .or. ival > this%nlakes) then
             write(errmsg,'(4x,a,1x,i4,1x,a,1x,i6)') &
               '****ERROR. lakeout FOR OUTLET ', n, 'MUST BE >= 0 and <= ',      &
-              this%noutlets
+              this%nlakes
             call store_error(errmsg)
             cycle readoutlet
           end if
@@ -3542,10 +3543,25 @@ contains
     class(LakType) :: this
     ! -- local
     integer(I4B) :: n
+    integer(I4B) :: j, iaux, ii
 ! ------------------------------------------------------------------------------
     !
     ! -- Advance the time series
     call this%TsManager%ad()
+    !
+    ! -- update auxiliary variables by copying from the derived-type time
+    !    series variable into the bndpackage auxvar variable so that this
+    !    information is properly written to the GWF budget file
+    if (this%naux > 0) then
+      do n = 1, this%nlakes
+        do j = this%idxlakeconn(n), this%idxlakeconn(n + 1) - 1
+          do iaux = 1, this%naux
+            ii = (n - 1) * this%naux + iaux
+            this%auxvar(iaux, j) = this%lauxvar(ii)%value
+          end do
+        end do
+      end do
+    end if
     !
     ! -- copy xnew into xold and set xnewpak to stage%value for
     !    constant stage lakes
@@ -3794,7 +3810,6 @@ contains
 !
 !    SPECIFICATIONS:
 ! --------------------------------------------------------------------------
-    use TdisModule, only: delt
     ! -- dummy
     class(LakType), intent(inout) :: this
     integer(I4B), intent(in) :: iend
@@ -3914,6 +3929,7 @@ contains
     real(DP) :: mvrratin
     real(DP) :: qtomvr
     integer(I4B) :: naux
+    real(DP), dimension(:), allocatable :: auxvartmp
     ! -- for budget
     integer(I4B) :: i, j, n, n2
     integer(I4B) :: ii
@@ -4415,18 +4431,20 @@ contains
                      this%name_model, this%name,                                &
                      ibinun, naux, this%auxname, this%nlakes, 1, 1,             &
                      this%nlakes, this%iout, delt, pertim, totim)
+        allocate(auxvartmp(naux))
         do n = 1, this%nlakes
           q = DZERO
           ! fill auxvar
           do i = 1, naux
             ii = (n-1) * naux + i
-            this%auxvar(i,n) = this%lauxvar(ii)%value
+            auxvartmp(i) = this%lauxvar(ii)%value
           end do
-          call this%dis%record_mf6_list_entry(ibinun, n, n, q, naux,       &
-                                                  this%auxvar(:,n),            &
-                                                  olconv=.FALSE.,              &
-                                                  olconv2=.FALSE.)
+          call this%dis%record_mf6_list_entry(ibinun, n, n, q, naux,           &
+                                              auxvartmp(:),                    &
+                                              olconv=.FALSE.,                  &
+                                              olconv2=.FALSE.)
         end do
+        deallocate(auxvartmp)
       end if
     end if
     ! -- return
@@ -4487,7 +4505,7 @@ contains
       if (this%inamedbound==1) then
         call UWWORD(line, iloc, 16, 1, 'lake', n, q, left=.TRUE.)
       end if
-      call UWWORD(line, iloc, 6, 1, 'lake', n, q, CENTER=.TRUE.)
+      call UWWORD(line, iloc, 6, 1, 'lake', n, q, CENTER=.TRUE., SEP=' ')
       call UWWORD(line, iloc, 11, 1, 'lake', n, q, CENTER=.TRUE.)
       ! -- create line separator
       linesep = repeat('-', iloc)
@@ -4500,7 +4518,7 @@ contains
       if (this%inamedbound==1) then
         call UWWORD(line, iloc, 16, 1, 'name', n, q, left=.TRUE.)
       end if
-      call UWWORD(line, iloc, 6, 1, 'no.', n, q, CENTER=.TRUE.)
+      call UWWORD(line, iloc, 6, 1, 'no.', n, q, CENTER=.TRUE., SEP=' ')
       call UWWORD(line, iloc, 11, 1, 'stage', n, q, CENTER=.TRUE.)
       ! -- write second line
       write(iout,'(1X,A)') line(1:iloc)
@@ -4512,7 +4530,7 @@ contains
         if (this%inamedbound==1) then
           call UWWORD(line, iloc, 16, 1, this%lakename(n), n, q, left=.TRUE.)
         end if
-        call UWWORD(line, iloc, 6, 2, text, n, q)
+        call UWWORD(line, iloc, 6, 2, text, n, q, SEP=' ')
         call UWWORD(line, iloc, 11, 3, text, n, this%xnewpak(n))
         write(iout, '(1X,A)') line(1:iloc)
       end do
@@ -5241,9 +5259,6 @@ contains
     ! -- formats
 10  format('Error: Boundary "',a,'" for observation "',a, &
            '" is invalid in package "',a,'"')
-30  format('Error: Boundary name not provided for observation "',a, &
-           '" in package "',a,'"')
-60  format('Error: Invalid node number in OBS input: ',i0)
     !
     do i = 1, this%obs%npakobs
       obsrv => this%obs%pakobs(i)%obsrv

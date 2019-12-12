@@ -406,7 +406,7 @@ contains
     integer(I4B), dimension(:), pointer, contiguous :: nboundchk
     ! -- format
     character(len=*),parameter :: fmthdbot = &
-      "('well head (',G0,') must be >= BOTTOM_ELEVATION (',G0',).')"
+      "('well head (', G0, ') must be >= BOTTOM_ELEVATION (', G0, ').')"
 ! ------------------------------------------------------------------------------
     !
     ! -- code
@@ -435,7 +435,8 @@ contains
     !
     ! -- read maw well data
     ! -- get wells block
-    call this%parser%GetBlock('PACKAGEDATA', isfound, ierr, supportopenclose=.true.)
+    call this%parser%GetBlock('PACKAGEDATA', isfound, ierr, &
+      supportopenclose=.true.)
     !
     ! -- parse locations block if detected
     if (isfound) then
@@ -1113,7 +1114,7 @@ contains
     character(len=MAXCHARLEN) :: ermsg, ermsgr
     ! -- formats
     character(len=*),parameter :: fmthdbot = &
-      "('well head (',G0,') must be >= BOTTOM_ELEVATION (',G0',).')"
+      "('well head (',G0,') must be >= BOTTOM_ELEVATION (',G0, ').')"
 ! ------------------------------------------------------------------------------
     !
     ! -- Find time interval of current stress period.
@@ -1847,13 +1848,26 @@ contains
     class(MawType) :: this
     ! -- local
     integer(I4B) :: n
+    integer(I4B) :: j, iaux, ibnd
 ! ------------------------------------------------------------------------------
-    !
-    !! -- call base advance functionality
-    !call this%BndType%bnd_ad()
     !
     ! -- Advance the time series
     call this%TsManager%ad()
+    !
+    ! -- update auxiliary variables by copying from the derived-type time
+    !    series variable into the bndpackage auxvar variable so that this
+    !    information is properly written to the GWF budget file
+    if (this%naux > 0) then
+      ibnd = 1
+      do n = 1, this%nmawwells
+        do j = 1, this%mawwells(n)%ngwfnodes
+          do iaux = 1, this%naux
+            this%auxvar(iaux, ibnd) = this%mawwells(n)%auxvar(iaux)%value
+          end do
+          ibnd = ibnd + 1
+        end do
+      end do
+    end if
     !
     ! -- copy xnew into xold
     do n = 1, this%nmawwells
@@ -1925,7 +1939,7 @@ contains
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
-    use TdisModule,only: delt, kper, kstp
+    use TdisModule,only: delt
     ! -- dummy
     class(MawType) :: this
     real(DP), dimension(:), intent(inout) :: rhs
@@ -2286,7 +2300,7 @@ contains
     real(DP) :: ratsum
     integer(I4B) :: naux
     ! -- for budget
-    integer(I4B) :: i, j, n
+    integer(I4B) :: j, n
     integer(I4B) :: n2
     integer(I4B) :: igwfnode
     integer(I4B) :: ibnd
@@ -2781,10 +2795,6 @@ contains
                      this%nmawwells, this%iout, delt, pertim, totim)
         do n = 1, this%nmawwells
           q = DZERO
-          ! fill auxvar
-          do i = 1, naux
-            this%auxvar(i,n) = this%mawwells(n)%auxvar(i)%value
-          end do
           call this%dis%record_mf6_list_entry(ibinun, n, n, q, naux,       &
                                                   this%auxvar(:,n),            &
                                                   olconv=.FALSE.,              &
@@ -3452,9 +3462,6 @@ contains
     ! -- formats
 10  format('Error: Boundary "',a,'" for observation "',a, &
            '" is invalid in package "',a,'"')
-30  format('Error: Boundary name not provided for observation "',a, &
-           '" in package "',a,'"')
-60  format('Error: Invalid node number in OBS input: ',i5)
     !
     !
     do i = 1, this%obs%npakobs

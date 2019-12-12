@@ -126,4 +126,20 @@ cd ex32-periodicbc
 ..\..\bin\mf6.exe
 cd ..
 
+cd ex33-csub-jacob
+..\..\bin\mf6.exe
+cd ..
+
+cd ex34-csub-sub01
+..\..\bin\mf6.exe
+cd ..
+
+cd ex35-csub-holly
+..\..\bin\mf6.exe
+cd ..
+
+cd ex36-csub-subwt01
+..\..\bin\mf6.exe
+cd ..
+
 pause

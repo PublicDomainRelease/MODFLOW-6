@@ -455,12 +455,12 @@ contains
     integer(I4B) :: ifdparam, mxvl, npp
     integer(I4B) :: imslinear
     character(len=linelength) :: errmsg, keyword, fname
+    character(len=linelength) :: msg
     integer(I4B) :: isymflg=1
     integer(I4B) :: ierr
     logical :: isfound, endOfBlock
     integer(I4B) :: ival
     real(DP) :: rval
-    real(DP) :: rclose
     character(len=*),parameter :: fmtcsvout = &
       "(4x, 'CSV OUTPUT WILL BE SAVED TO FILE: ', a, /4x, 'OPENED ON UNIT: ', I7)"
     character(len=*),parameter :: fmtptcout = &
@@ -482,7 +482,8 @@ contains
     mxvl = 0
     !
     ! -- get options block
-    call this%parser%GetBlock('OPTIONS', isfound, ierr, blockRequired=.false.)
+    call this%parser%GetBlock('OPTIONS', isfound, ierr, &
+      supportOpenClose=.true., blockRequired=.false.)
     !
     ! -- parse options block if detected
     if (isfound) then
@@ -536,9 +537,21 @@ contains
             call store_error(errmsg)
           end if
         case ('NO_PTC')
-          call this%parser%DevOpt()
-          this%iallowptc = 0
-          write(IOUT,'(1x,A)') 'PSEUDO-TRANSIENT CONTINUATION DISABLED'
+          call this%parser%GetStringCaps(keyword)
+          select case(keyword)
+            case ('ALL')
+              ival = 0
+              msg = 'ALL'
+            case ('FIRST')
+              ival = -1
+              msg = 'THE FIRST'
+            case default
+              ival = 0
+              msg = 'ALL'
+          end select
+          this%iallowptc = ival
+          write(IOUT,'(1x,A)') 'PSEUDO-TRANSIENT CONTINUATION DISABLED FOR' // &
+            ' ' // trim(adjustl(msg)) // ' STRESS-PERIOD(S)'
         !
         ! -- right now these are options that are only available in the
         !    development version and are not included in the documentation.
@@ -617,8 +630,6 @@ contains
       write(iout,'(1x,a)')'NO IMS OPTION BLOCK DETECTED.'
     end if
 
-00020 FORMAT(1X,'SPECIFIED OPTION:',/,                                         &
-    &       1X,'SOLVER INPUT VALUES WILL BE USER-SPECIFIED')
 00021 FORMAT(1X,'SIMPLE OPTION:',/,                                            &
     &       1X,'DEFAULT SOLVER INPUT VALUES FOR FAST SOLUTIONS')
 00023 FORMAT(1X,'MODERATE OPTION:',/,1X,'DEFAULT SOLVER',                      &
@@ -631,7 +642,8 @@ contains
     call this%sln_setouter(ifdparam)
     !
     ! -- get NONLINEAR block
-    call this%parser%GetBlock('NONLINEAR', isfound, ierr)
+    call this%parser%GetBlock('NONLINEAR', isfound, ierr, &
+      supportOpenClose=.true., blockRequired=.FALSE.)
     !
     ! -- parse NONLINEAR block if detected
     if (isfound) then
@@ -1080,6 +1092,7 @@ contains
     integer(I4B) :: i0, i1
     integer(I4B) :: iend
     integer(I4B) :: iptc
+    integer(I4B) :: iallowptc
     integer(I4B) :: nodeu
     real(DP) :: ptcf
     real(DP) :: dt
@@ -1090,7 +1103,7 @@ contains
     ! -- formats
     character(len=*), parameter :: fmtnocnvg =                                 &
       "(1X,'Solution ', i0, ' did not converge for stress period ', i0,        &
-       ' and time step ', i0)"
+       &' and time step ', i0)"
  11 FORMAT(//1X,'OUTER ITERATION SUMMARY',/,1x,139('-'),/,                     &
         18x,'     OUTER     INNER BACKTRACK BACKTRACK        INCOMING        ',&
            'OUTGOING         MAXIMUM                    MAXIMUM CHANGE',/,     &
@@ -1174,7 +1187,20 @@ contains
       do im = 1, this%modellist%Count()
         mp => GetNumericalModelFromList(this%modellist, im)
         call mp%model_ptcchk(iptc)
-        iptc = iptc * this%iallowptc
+        !
+        ! -- set iallowptc
+        ! -- no_ptc_option is FIRST
+        if (this%iallowptc < 0) then
+          if (kper > 1) then
+            iallowptc = 1
+          else
+            iallowptc = 0
+          end if
+        ! -- no_ptc_option is ALL (0) or using PTC (1)
+        else
+          iallowptc = this%iallowptc
+        end if
+        iptc = iptc * iallowptc
         if (iptc /= 0) then
           if (n == 1) then
             write (iout, '(//)')
@@ -1265,7 +1291,7 @@ contains
         !
         ! -- linear solve
         call code_timer(0, ttsoln, this%ttsoln)
-        CALL this%sln_ls(kiter,kstp,kper,iter,itertot,iptc,ptcf)
+        CALL this%sln_ls(kiter, kstp, kper, iter, itertot, iptc, ptcf)
         call code_timer(1, ttsoln, this%ttsoln)
         !
         !-------------------------------------------------------
@@ -1882,6 +1908,7 @@ contains
     integer(I4B) :: n
     integer(I4B) :: itestmat, i, i1, i2
     integer(I4B) :: iptct
+    integer(I4B) :: iallowptc
     real(DP) :: adiag, diagval
     real(DP) :: l2norm
     real(DP) :: ptcval
@@ -1889,7 +1916,7 @@ contains
     real(DP) :: bnorm
     character(len=50) :: fname
     character(len=*), parameter :: fmtfname = "('mf6mat_', i0, '_', i0, &
-      '_', i0, '_', i0, '.txt')"
+      &'_', i0, '_', i0, '.txt')"
 ! ------------------------------------------------------------------------------
     !
     ! -- take care of loose ends for all nodes before call to solver
@@ -1916,7 +1943,20 @@ contains
       endif
     end do
     ! -- pseudo transient continuation
-    iptct = iptc * this%iallowptc
+    !
+    ! -- set iallowptc
+    ! -- no_ptc_option is FIRST
+    if (this%iallowptc < 0) then
+      if (kper > 1) then
+        iallowptc = 1
+      else
+        iallowptc = 0
+      end if
+    ! -- no_ptc_option is ALL (0) or using PTC (1)
+    else
+      iallowptc = this%iallowptc
+    end if
+    iptct = iptc * iallowptc
     if (iptct /= 0) then
       call this%sln_l2norm(this%neq, this%nja,                                 &
                            this%ia, this%ja, this%active,                      &
@@ -1936,7 +1976,7 @@ contains
         end if
       end if
     end if
-    iptct = iptc * this%iallowptc
+    iptct = iptc * iallowptc
     if (iptct /= 0) then
       if (kiter == 1) then
         if (this%iptcout > 0) then
@@ -2009,7 +2049,6 @@ contains
           WRITE(99,'(*(G0,:,","))') N, this%RHS(N), (this%ja(i),i=i1,i2), &
                         (this%AMAT(I),I=I1,I2)
         ENDDO
-66      FORMAT(I9,1X,G15.6,2X,100G15.6)
         close(99)
         !stop
       endif
@@ -2117,7 +2156,6 @@ contains
     class(NumericalExchangeType), pointer :: cp
     integer(I4B), intent(in) :: kiter
     ! -- local
-    character (len=16) :: cval
     integer(I4B) :: ic
     integer(I4B) :: im
     integer(I4B) :: nb
