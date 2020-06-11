@@ -2,7 +2,7 @@ module GwfModule
 
   use KindModule,                  only: DP, I4B
   use InputOutputModule,           only: ParseLine, upcase
-  use ConstantsModule,             only: LENFTYPE, DZERO, DEM1, DTEN, DEP20
+  use ConstantsModule,             only: LENFTYPE, LENPAKLOC, DZERO, DEM1, DTEN, DEP20
   use NumericalModelModule,        only: NumericalModelType
   use BaseDisModule,               only: DisBaseType
   use BndModule,                   only: BndType, AddBndToList, GetBndFromList
@@ -71,7 +71,6 @@ module GwfModule
     procedure :: model_ot                => gwf_ot
     procedure :: model_fp                => gwf_fp
     procedure :: model_da                => gwf_da
-    procedure :: get_nsubtimes           => gwf_get_nsubtimes
     procedure :: model_bdentry           => gwf_bdentry
     procedure :: get_iasym               => gwf_get_iasym
     ! -- private
@@ -107,7 +106,7 @@ module GwfModule
     use ListsModule,                only: basemodellist
     use BaseModelModule,            only: AddBaseModelToList
     use SimModule,                  only: ustop, store_error, count_errors
-    use InputOutputModule,          only: write_centered
+    use GenericUtilitiesModule,     only: write_centered
     use ConstantsModule,            only: LINELENGTH, LENPACKAGENAME
     use VersionModule,              only: VERSION, MFVNAM, MFTITLE,             &
                                           FMTDISCLAIMER, IDEVELOPMODE
@@ -164,19 +163,20 @@ module GwfModule
     call namefile_obj%openlistfile(this%iout)
     !
     ! -- Write title to list file
-    call write_centered('MODFLOW'//MFVNAM, this%iout, 80)
-    call write_centered(MFTITLE, this%iout, 80)
-    call write_centered('GROUNDWATER FLOW MODEL (GWF)', this%iout, 80)
-    call write_centered('VERSION '//VERSION, this%iout, 80)
+    call write_centered('MODFLOW'//MFVNAM, 80, iunit=this%iout)
+    call write_centered(MFTITLE, 80, iunit=this%iout)
+    call write_centered('GROUNDWATER FLOW MODEL (GWF)', 80, iunit=this%iout)
+    call write_centered('VERSION '//VERSION, 80, iunit=this%iout)
     !
     ! -- Write if develop mode
-    if (IDEVELOPMODE == 1) call write_centered('***DEVELOP MODE***',           &
-      this%iout, 80)
+    if (IDEVELOPMODE == 1) then
+      call write_centered('***DEVELOP MODE***', 80, iunit=this%iout)
+    end if
     !
     ! -- Write compiler version
     call get_compiler(compiler)
-    call write_centered(' ', this%iout, 80)
-    call write_centered(trim(adjustl(compiler)), this%iout, 80)
+    call write_centered(' ', 80, iunit=this%iout)
+    call write_centered(trim(adjustl(compiler)), 80, iunit=this%iout)
     !
     ! -- Write disclaimer
     write(this%iout, FMTDISCLAIMER)
@@ -281,7 +281,7 @@ module GwfModule
     call csub_cr(this%csub, this%name, this%insto, this%sto%name,               &
                  this%incsub, this%iout)
     call ic_cr(this%ic, this%name, this%inic, this%iout, this%dis)
-    call mvr_cr(this%mvr, this%name, this%inmvr, this%iout)
+    call mvr_cr(this%mvr, this%name, this%inmvr, this%iout, this%dis)
     call oc_cr(this%oc, this%name, this%inoc, this%iout)
     call gwf_obs_cr(this%obs, this%inobs)
     !
@@ -338,7 +338,7 @@ module GwfModule
     call this%allocate_arrays()
     !
     ! -- Define packages and assign iout for time series managers
-    do ip=1,this%bndlist%Count()
+    do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_df(this%neq, this%dis)
     enddo
@@ -456,7 +456,7 @@ module GwfModule
     call this%oc%oc_ar(this%x, this%dis, this%npf%hnoflo)
     !
     ! -- Package input files now open, so allocate and read
-    do ip=1,this%bndlist%Count()
+    do ip = 1,this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%set_pointers(this%dis%nodes, this%ibound, this%x,           &
                                 this%xold, this%flowja)
@@ -504,7 +504,7 @@ module GwfModule
     return
   end subroutine gwf_rp
 
-  subroutine gwf_ad(this, ipicard, isubtime)
+  subroutine gwf_ad(this)
 ! ******************************************************************************
 ! gwf_ad -- GroundWater Flow Model Time Step Advance
 ! Subroutine: (1) calls package advance subroutines
@@ -517,8 +517,6 @@ module GwfModule
     ! -- dummy
     class(GwfModelType) :: this
     class(BndType), pointer :: packobj
-    integer(I4B), intent(in) :: ipicard
-    integer(I4B), intent(in) :: isubtime
     ! -- local
     integer(I4B) :: ip, n
 ! ------------------------------------------------------------------------------
@@ -675,7 +673,7 @@ module GwfModule
     return
   end subroutine gwf_fc
 
-  subroutine gwf_cc(this, kiter, iend, icnvg, hclose, rclose)
+  subroutine gwf_cc(this, innertot, kiter, iend, icnvgmod, cpak, ipak, dpak)
 ! ******************************************************************************
 ! gwf_cc -- GroundWater Flow Model Final Convergence Check for Boundary Packages
 ! Subroutine: (1) calls package cc routines
@@ -685,11 +683,13 @@ module GwfModule
 ! ------------------------------------------------------------------------------
     ! -- dummy
     class(GwfModelType) :: this
+    integer(I4B),intent(in) :: innertot
     integer(I4B),intent(in) :: kiter
     integer(I4B),intent(in) :: iend
-    integer(I4B),intent(inout) :: icnvg
-    real(DP), intent(in) :: hclose
-    real(DP), intent(in) :: rclose
+    integer(I4B),intent(in) :: icnvgmod
+    character(len=LENPAKLOC), intent(inout) :: cpak
+    integer(I4B), intent(inout) :: ipak
+    real(DP), intent(inout) :: dpak
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
@@ -697,18 +697,21 @@ module GwfModule
 ! ------------------------------------------------------------------------------
     !
     ! -- If mover is on, then at least 2 outers required
-    if (this%inmvr > 0) call this%mvr%mvr_cc(kiter, iend, icnvg)
+    if (this%inmvr > 0) then
+      call this%mvr%mvr_cc(innertot, kiter, iend, icnvgmod, cpak, ipak, dpak)
+    end if
     !
     ! -- csub convergence check
     if (this%incsub > 0) then
-      call this%csub%csub_cc(iend, icnvg, this%dis%nodes, this%x, this%xold,     &
-                             hclose, rclose)
+      call this%csub%csub_cc(innertot, kiter, iend, icnvgmod,                    &
+                             this%dis%nodes, this%x, this%xold,                  &
+                             cpak, ipak, dpak)
     end if
     !
     ! -- Call package cc routines
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
-      call packobj%bnd_cc(iend, icnvg, hclose, rclose)
+      call packobj%bnd_cc(innertot, kiter, iend, icnvgmod, cpak, ipak, dpak)
     enddo
     !
     ! -- return
@@ -854,7 +857,7 @@ module GwfModule
     return
   end subroutine gwf_ptc
 
-  subroutine gwf_nur(this, neqmod, x, xtemp, dx, inewtonur)
+  subroutine gwf_nur(this, neqmod, x, xtemp, dx, inewtonur, dxmax, locmax)
 ! ******************************************************************************
 ! gwf_nur -- under-relaxation
 ! Subroutine: (1) Under-relaxation of Groundwater Flow Model Heads for current
@@ -873,10 +876,9 @@ module GwfModule
     real(DP), dimension(neqmod), intent(in) :: xtemp
     real(DP), dimension(neqmod), intent(inout) :: dx
     integer(I4B), intent(inout) :: inewtonur
+    real(DP), intent(inout) :: dxmax
+    integer(I4B), intent(inout) :: locmax
     ! -- local
-    !integer(I4B) :: n
-    !integer(I4B) :: jcol
-    !real(DP) :: botm
     integer(I4B) :: i0
     integer(I4B) :: i1
     class(BndType), pointer :: packobj
@@ -888,7 +890,7 @@ module GwfModule
     !    under-relaxation is turned on.
     if (this%inewton /= 0 .and. this%inewtonur /= 0) then
       if (this%innpf > 0) then
-        call this%npf%npf_nur(neqmod, x, xtemp, dx, inewtonur)
+        call this%npf%npf_nur(neqmod, x, xtemp, dx, inewtonur, dxmax, locmax)
       end if
       !
       ! -- Call package nur routines
@@ -898,7 +900,7 @@ module GwfModule
         if (packobj%npakeq > 0) then
           i1 = i0 + packobj%npakeq - 1
           call packobj%bnd_nur(packobj%npakeq, x(i0:i1), xtemp(i0:i1), &
-                               dx(i0:i1), inewtonur)
+                               dx(i0:i1), inewtonur, dxmax, locmax)
           i0 = i1 + 1
         end if
       enddo
@@ -1004,6 +1006,13 @@ module GwfModule
     !
     ! -- Mover budget
     if(this%inmvr > 0) call this%mvr%mvr_bd(icbcfl, ibudfl, isuppress_output)
+    !
+    ! -- Recalculate package hcof and rhs so that bnd_bd will calculate
+    !    flows based on the final head solution
+    do ip = 1, this%bndlist%Count()
+      packobj => GetBndFromList(this%bndlist, ip)
+      call packobj%bnd_cf(reset_mover=.false.)
+    enddo
     !
     ! -- Boundary packages calculate budget and total flows to model budget
     do ip = 1, this%bndlist%Count()
@@ -1202,27 +1211,7 @@ module GwfModule
     ! -- return
     return
   end subroutine gwf_da
-
-  function gwf_get_nsubtimes(this) result(nsubtimes)
-! ******************************************************************************
-! gwf_get_nsubtimes -- Return number of subtimesteps
-! Subtimesteps not implemented yet, so just return 1.
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-    !
-    ! -- result
-    integer(I4B) :: nsubtimes
-    class(GwfModelType) :: this
-! ------------------------------------------------------------------------------
-    !
-    nsubtimes = 1
-    !
-    ! -- return
-    return
-  end function gwf_get_nsubtimes
-
+  
   subroutine gwf_bdentry(this, budterm, budtxt, rowlabel)
 ! ******************************************************************************
 ! gwf_bdentry -- GroundWater Flow Model Budget Entry

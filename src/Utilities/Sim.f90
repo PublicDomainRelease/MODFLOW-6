@@ -1,46 +1,43 @@
 module SimModule
   
-  use KindModule,         only: DP, I4B
-  use ConstantsModule,    only: MAXCHARLEN, LINELENGTH, ISTDOUT
-  use SimVariablesModule, only: iout, ireturnerr
+  use KindModule,             only: DP, I4B
+  use DefinedMacros,          only: get_os
+  use ConstantsModule,        only: MAXCHARLEN, LINELENGTH,                      &
+                                    DONE,                                        &
+                                    IUSTART, IULAST,                             &
+                                    VSUMMARY, VALL, VDEBUG,                      &
+                                    OSWIN, OSUNDEF
+  use SimVariablesModule,     only: istdout, iout, isim_level, ireturnerr,       &
+                                    iforcestop, iunext
+  use GenericUtilitiesModule, only: sim_message, stop_with_error
+  use MessageModule,          only: MessageType
 
   implicit none
 
   private
   public :: count_errors
-  public :: iverbose
-  public :: sim_message
   public :: store_error
   public :: ustop
   public :: converge_reset
   public :: converge_check
   public :: final_message
   public :: store_warning
+  public :: deprecation_warning
   public :: store_note
   public :: count_warnings
   public :: count_notes
   public :: store_error_unit
   public :: store_error_filename
-  public :: print_notes
-  public :: maxerrors
+  public :: MaxErrors
   
-  integer(I4B) :: iverbose = 0 !0: print nothing
-                               !1: print first level subroutine information
-  character(len=MAXCHARLEN), allocatable, dimension(:) :: sim_errors
-  character(len=MAXCHARLEN), allocatable, dimension(:) :: sim_warnings
-  character(len=MAXCHARLEN), allocatable, dimension(:) :: sim_notes
-  integer(I4B) :: nerrors = 0
-  integer(I4B) :: maxerrors = 1000
-  integer(I4B) :: maxerrors_exceeded = 0
-  integer(I4B) :: nwarnings = 0
-  integer(I4B) :: nnotes = 0
-  integer(I4B) :: inc_errors = 100
-  integer(I4B) :: inc_warnings = 100
-  integer(I4B) :: inc_notes = 100
+  type(MessageType) :: sim_errors
+  type(MessageType) :: sim_uniterrors
+  type(MessageType) :: sim_warnings
+  type(MessageType) :: sim_notes
 
 contains
 
-function count_errors()
+function count_errors() result(ncount)
 ! ******************************************************************************
 ! Return error count
 ! ******************************************************************************
@@ -49,17 +46,13 @@ function count_errors()
 ! ------------------------------------------------------------------------------
   ! -- modules
   ! -- return
-  integer(I4B) :: count_errors
+  integer(I4B) :: ncount
 ! ------------------------------------------------------------------------------
-  if (allocated(sim_errors)) then
-    count_errors = nerrors
-  else
-    count_errors = 0
-  endif
+  ncount = sim_errors%count_message()
   return
 end function count_errors
 
-function count_warnings()
+function count_warnings() result(ncount)
 ! ******************************************************************************
 ! Return warning count
 ! ******************************************************************************
@@ -68,17 +61,13 @@ function count_warnings()
 ! ------------------------------------------------------------------------------
   ! -- modules
   ! -- return
-  integer(I4B) :: count_warnings
+  integer(I4B) :: ncount
 ! ------------------------------------------------------------------------------
-  if (allocated(sim_warnings)) then
-    count_warnings = nwarnings
-  else
-    count_warnings = 0
-  endif
+  ncount = sim_warnings%count_message()
   return
 end function count_warnings
 
-function count_notes()
+function count_notes() result(ncount)
 ! ******************************************************************************
 ! Return notes count
 ! ******************************************************************************
@@ -87,15 +76,30 @@ function count_notes()
 ! ------------------------------------------------------------------------------
   ! -- modules
   ! -- return
-  integer(I4B) :: count_notes
+  integer(I4B) :: ncount
 ! ------------------------------------------------------------------------------
-  if (allocated(sim_notes)) then
-    count_notes = nnotes
-  else
-    count_notes = 0
-  endif
+  ncount = sim_notes%count_message()
   return
 end function count_notes
+
+subroutine MaxErrors(imax)
+! ******************************************************************************
+! Set the maximum number of errors saved
+! ******************************************************************************
+!
+!    SPECIFICATIONS:
+! ------------------------------------------------------------------------------
+  ! -- dummy
+  integer(I4B), intent(in) :: imax
+  ! -- local
+! ------------------------------------------------------------------------------
+  !
+  ! -- set the maximum number of error messages that will be saved
+  call sim_errors%set_max_message(imax)
+  !
+  ! -- return
+  return
+end subroutine MaxErrors
 
 subroutine store_error(errmsg)
 ! ******************************************************************************
@@ -109,35 +113,63 @@ subroutine store_error(errmsg)
   ! -- dummy
   character(len=*), intent(in) :: errmsg
   ! -- local
-  logical :: inc_array
-  integer(I4B) :: i
 ! ------------------------------------------------------------------------------
   !
-  ! -- determine if the sim_errors should be expanded
-  inc_array = .TRUE.
-  if (allocated(sim_errors)) then
-    if (count_errors() < size(sim_errors)) then
-      inc_array = .FALSE.
+  ! -- store error
+  call sim_errors%store_message(errmsg)
+  !
+  ! -- return
+  return
+end subroutine store_error
+
+subroutine get_filename(iunit, fname)
+! ******************************************************************************
+! Get filename from unit number. If the INQUIRE function returns the full
+! path (for example, the INTEL compiler) then the returned file name (fname)  
+! is limited to the filename without the path.
+! ******************************************************************************
+!
+!    SPECIFICATIONS:
+! ------------------------------------------------------------------------------
+  ! -- modules
+  ! -- dummy
+  integer(I4B), intent(in) :: iunit
+  character(len=*), intent(inout) :: fname
+  ! -- local
+  integer(I4B) :: ipos
+  integer(I4B) :: ios
+  integer(I4B) :: ilen
+! ------------------------------------------------------------------------------
+  !
+  ! -- get file name from unit number
+  inquire(unit=iunit, name=fname)
+  !
+  ! -- determine the operating system
+  ios = get_os()
+  !
+  ! -- extract filename from full path, if present
+  !    forward slash on linux, unix, and osx
+  if (ios /= OSWIN) then
+    ipos = index(fname, '/', back=.TRUE.)
+  end if
+  !
+  ! -- check for backslash on windows or undefined os and 
+  !    forward slashes were not found
+  if (ios == OSWIN .or. ios == OSUNDEF) then
+    if (ipos < 1) then
+      ipos = index(fname, '\', back=.TRUE.)
     end if
   end if
   !
-  ! -- resize sim_errors
-  if (inc_array) then
-    call ExpandArray(sim_errors, increment=inc_errors)
-    inc_errors = inc_errors * 1.1
+  ! -- exclude the path from the file name
+  if (ipos > 0) then
+    ilen = len_trim(fname)
+    write(fname, '(a)') fname(ipos+1:ilen) // ' '
   end if
   !
-  ! -- store this error
-  i = count_errors() + 1
-  if (i <= maxerrors) then
-    nerrors = i
-    sim_errors(i) = errmsg
-  else
-    maxerrors_exceeded = maxerrors_exceeded + 1
-  end if
-  !
+  ! -- return
   return
-end subroutine store_error
+end subroutine get_filename
 
 subroutine store_error_unit(iunit)
 ! ******************************************************************************
@@ -151,12 +183,16 @@ subroutine store_error_unit(iunit)
   integer(I4B), intent(in) :: iunit
   ! -- local
   character(len=LINELENGTH) :: fname
+  character(len=LINELENGTH) :: errmsg
 ! ------------------------------------------------------------------------------
   !
+  ! -- store error unit
   inquire(unit=iunit, name=fname)
-  call store_error('ERROR OCCURRED WHILE READING FILE: ')
-  call store_error(trim(adjustl(fname)))
+  write(errmsg,'(3a)')                                                           &
+    "ERROR OCCURRED WHILE READING FILE '", trim(adjustl(fname)), "'"
+  call sim_uniterrors%store_message(errmsg)
   !
+  ! -- return
   return
 end subroutine store_error_unit
 
@@ -171,11 +207,15 @@ subroutine store_error_filename(filename)
   ! -- dummy
   character(len=*), intent(in) :: filename
   ! -- local
+  character(len=LINELENGTH) :: errmsg
 ! ------------------------------------------------------------------------------
   !
-  call store_error('ERROR OCCURRED WHILE READING FILE: ')
-  call store_error(trim(adjustl(filename)))
+  ! -- store error unit
+  write(errmsg,'(3a)')                                                           &
+    "ERROR OCCURRED WHILE READING FILE '", trim(adjustl(filename)), "'"
+  call sim_uniterrors%store_message(errmsg)
   !
+  ! -- return
   return
 end subroutine store_error_filename
 
@@ -187,30 +227,68 @@ subroutine store_warning(warnmsg)
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
   ! -- modules
-  use ArrayHandlersModule, only: ExpandArray
   ! -- dummy
   character(len=*), intent(in) :: warnmsg
-  ! -- local
-  logical :: inc_array
-  integer(I4B) :: i
 ! ------------------------------------------------------------------------------
   !
-  inc_array = .TRUE.
-  if (allocated(sim_warnings)) then
-    if (count_warnings() < size(sim_warnings)) then
-      inc_array = .FALSE.
-    end if
-  end if
-  if (inc_array) then
-    call ExpandArray(sim_warnings, increment=inc_warnings)
-    inc_warnings = inc_warnings * 1.1
-  end if
-  i = count_warnings() + 1
-  nwarnings = i
-  sim_warnings(i) = warnmsg
+  ! -- store warning
+  call sim_warnings%store_message(warnmsg)
   !
+  ! -- return
   return
 end subroutine store_warning
+
+subroutine deprecation_warning(cblock, cvar, cver, endmsg, iunit)
+! ******************************************************************************
+! Store a warning message for deprecated variables and printing at the 
+! end of simulation
+!
+! -- Arguments are as follows:
+!       CBLOCK       : block name
+!       CVAR         : variable name
+!       CVER         : version when variable was deprecated  
+!       ENDMSG       : optional user defined message to append at the end of 
+!                      the deprecation warning
+!       IUNIT        : optional input file unit number with the deprecated 
+!                      variable
+!
+! ******************************************************************************
+!
+!    SPECIFICATIONS:
+! ------------------------------------------------------------------------------
+  ! -- modules
+  use ArrayHandlersModule, only: ExpandArray
+  ! -- dummy
+  character(len=*), intent(in) :: cblock
+  character(len=*), intent(in) :: cvar
+  character(len=*), intent(in) :: cver
+  character(len=*), intent(in), optional :: endmsg
+  integer(I4B), intent(in), optional :: iunit
+  ! -- local
+  character(len=MAXCHARLEN) :: message
+  character(len=LINELENGTH) :: fname
+! ------------------------------------------------------------------------------
+  !
+  ! -- build message
+  write(message,'(a)')                                                           &
+    trim(cblock) // " BLOCK VARIABLE '" // trim(cvar) // "'"
+  if (present(iunit)) then
+    call get_filename(iunit, fname)
+    write(message,'(a,1x,3a)')                                                   &
+      trim(message), "IN FILE '", trim(fname), "'"
+  end if 
+  write(message,'(a)')                                                           &
+    trim(message) // ' WAS DEPRECATED IN VERSION ' // trim(cver) // '.'
+  if (present(endmsg)) then
+    write(message,'(a,1x,2a)') trim(message), trim(endmsg), '.'
+  end if
+  !
+  ! -- store warning
+  call sim_warnings%store_message(message)
+  !
+  ! -- return
+  return
+end subroutine deprecation_warning
 
 subroutine store_note(note)
 ! ******************************************************************************
@@ -224,305 +302,17 @@ subroutine store_note(note)
   ! -- dummy
   character(len=*), intent(in) :: note
   ! -- local
-  logical :: inc_array
-  integer(I4B) :: i
 ! ------------------------------------------------------------------------------
   !
-  inc_array = .TRUE.
-  if (allocated(sim_notes)) then
-    if (count_notes() < size(sim_notes)) then
-      inc_array = .FALSE.
-    end if
-  end if
-  if (inc_array) then
-    call ExpandArray(sim_notes, increment=inc_notes)
-    inc_notes = inc_notes * 1.1
-  end if
-  i = count_notes() + 1
-  nnotes = i
-  sim_notes(i) = note
+  ! -- store note
+  call sim_notes%store_message(note)
   !
+  ! -- return
   return
 end subroutine store_note
 
-logical function print_errors()
-! ******************************************************************************
-! Print all error messages that have been stored
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-  ! -- modules
-  ! -- local
-  integer(I4B) :: i, isize
-  character(len=LINELENGTH) :: errmsg
-  ! -- formats
-10 format(/,'ERROR REPORT:',/)
-! ------------------------------------------------------------------------------
-  !
-  print_errors = .false.
-  if (allocated(sim_errors)) then
-    isize = count_errors()
-    if (isize > 0) then
-      print_errors = .true.
-      if (iout > 0) write(iout, 10)
-      write(*, 10)
-      do i = 1, isize
-        call write_message(sim_errors(i))
-        if (iout > 0) call write_message(sim_errors(i), iout)
-      enddo
-      !
-      ! -- write the number of errors
-      write(errmsg, '(i0, a)') isize,                                          &
-        ' errors detected.'
-      call write_message(trim(errmsg))
-      if (iout > 0) call write_message(trim(errmsg), iout)
-      !
-      ! -- write number of additional errors
-      if (maxerrors_exceeded > 0) then
-        write(errmsg, '(i0, a)') maxerrors_exceeded,                           &
-          ' additional errors detected but not printed.'
-        call write_message(trim(errmsg))
-        if (iout > 0) call write_message(trim(errmsg), iout)
-      end if
-    endif
-  endif
-  !
-  return
-end function print_errors
-
-subroutine print_warnings()
-! ******************************************************************************
-! Print all warning messages that have been stored
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-  ! -- modules
-  ! -- local
-  integer(I4B) :: i, isize
-  ! -- formats
-10 format(/,'WARNINGS:',/)
-! ------------------------------------------------------------------------------
-  !
-  if (allocated(sim_warnings)) then
-    isize = count_warnings()
-    if (isize>0) then
-      if (iout>0) write(iout,10)
-      write(*,10)
-      do i=1,isize
-        call write_message(sim_warnings(i))
-        if (iout>0) call write_message(sim_warnings(i),iout)
-      enddo
-    endif
-    write(*,'()')
-    if (iout>0) write(iout,'()')
-  endif
-  !
-  return
-end subroutine print_warnings
-
-subroutine print_notes(numberlist)
-! ******************************************************************************
-! Print all notes that have been stored
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-  ! -- modules
-  ! -- dummy
-  logical, intent(in), optional :: numberlist
-  ! -- local
-  integer(I4B) :: i, isize
-  character(len=MAXCHARLEN+10) :: noteplus
-  logical :: numlist
-  ! -- formats
-10 format(/,'NOTES:')
-20 format(i0,'. ',a)
-30 format(a)
-! ------------------------------------------------------------------------------
-  !
-  if (present(numberlist)) then
-    numlist = numberlist
-  else
-    numlist = .true.
-  endif
-  !
-  if (allocated(sim_notes)) then
-    isize = count_notes()
-    if (isize>0) then
-      if (iout>0) write(iout,10)
-      write(*,10)
-      do i=1,isize
-        if (numlist) then
-          write(noteplus,20)i,trim(sim_notes(i))
-        else
-          write(noteplus,30)trim(sim_notes(i))
-        endif
-        call write_message(noteplus)
-        if (iout>0) call write_message(noteplus,iout)
-      enddo
-    endif
-  endif
-  !
-  return
-end subroutine print_notes
-
-subroutine write_message(message, iunit, error, leadspace, endspace)
-! ******************************************************************************
-! Subroutine write_message formats and writes a message.
-!
-! -- Arguments are as follows:
-!       MESSAGE      : message to be written
-!       IUNIT        : the unit number to which the message is written
-!       ERROR        : if true precede message with "Error"
-!       LEADSPACE    : if true precede message with blank line
-!       ENDSPACE     : if true follow message by blank line
-!
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-  ! -- dummy
-  character (len=*), intent(in) :: message
-  integer(I4B),      intent(in), optional :: iunit
-  logical,           intent(in), optional :: error
-  logical,           intent(in), optional :: leadspace
-  logical,           intent(in), optional :: endspace
-  ! -- local
-  integer(I4B)              :: jend, i, nblc, junit, leadblank
-  integer(I4B)              :: itake, j
-  character(len=20)         :: ablank
-  character(len=MAXCHARLEN) :: amessage
-! ------------------------------------------------------------------------------
-  !
-  amessage = message
-  if (amessage==' ') return
-  if (amessage(1:1).ne.' ') amessage=' ' // trim(amessage)
-  ablank=' '
-  itake=0
-  j=0
-  if(present(iunit))then
-    junit = iunit
-  else
-    junit = ISTDOUT
-  end if
-  if(present(leadspace))then
-    if(leadspace) then
-      if (junit>0) then
-        write(junit,*)
-      else
-        write(*,*)
-      endif
-    endif
-  endif
-  if(present(error))then
-    if(error)then
-      nblc=len_trim(amessage)
-      amessage=adjustr(amessage(1:nblc+8))
-      if(nblc+8.lt.len(amessage)) amessage(nblc+9:)=' '
-      amessage(1:8)=' Error: '
-    end if
-  end if
-  !
-  do i=1,20
-    if(amessage(i:i).ne.' ')exit
-  end do
-  leadblank=i-1
-  nblc=len_trim(amessage)
-  !
-5 continue
-  jend=j+78-itake
-  if(jend.ge.nblc) go to 100
-  do i=jend,j+1,-1
-    if(amessage(i:i).eq.' ') then
-      if(itake.eq.0) then
-        if (junit>0) then
-          write(junit,'(a)',err=200) amessage(j+1:i)
-        else
-          write(*,'(a)',err=200) amessage(j+1:i)
-        endif
-        itake=2+leadblank
-      else
-        if (junit>0) then
-          write(junit,'(a)',err=200) ablank(1:leadblank+2)//amessage(j+1:i)
-        else
-          write(*,'(a)',err=200) ablank(1:leadblank+2)//amessage(j+1:i)
-        endif
-      end if
-      j=i
-      go to 5
-    end if
-  end do
-  if(itake.eq.0)then
-    if (junit>0) then
-      write(junit,'(a)',err=200) amessage(j+1:jend)
-    else
-      write(*,'(a)',err=200) amessage(j+1:jend)
-    endif
-    itake=2+leadblank
-  else
-    if (junit>0) then
-      write(junit,'(a)',err=200) ablank(1:leadblank+2)//amessage(j+1:jend)
-    else
-      write(*,'(a)',err=200) ablank(1:leadblank+2)//amessage(j+1:jend)
-    endif
-  end if
-  j=jend
-  go to 5
-  !
-100 continue
-  jend=nblc
-  if(itake.eq.0)then
-    if (junit>0) then
-      write(junit,'(a)',err=200) amessage(j+1:jend)
-    else
-      write(*,'(a)',err=200) amessage(j+1:jend)
-    endif
-  else
-    if (junit>0) then
-      write(junit,'(a)',err=200) ablank(1:leadblank+2)//amessage(j+1:jend)
-    else
-      write(*,'(a)',err=200) ablank(1:leadblank+2)//amessage(j+1:jend)
-    endif
-  end if
-  !
-  if(present(endspace))then
-    if(endspace) then
-      if (junit>0) then
-        write(junit,*)
-      else
-        write(*,*)
-      endif
-    endif
-  end if
-  return
-  !
-200 continue
-  call ustop()
-  !
-end subroutine write_message
-
-subroutine sim_message(iv, message)
-! ******************************************************************************
-! Print all notes that have been stored
-!    iv is the verbosity level of this message
-!     (1) means primary subroutine for simulation, exchange, model,
-!         solution, package, etc.
-!    message is a character string message to write
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-  ! -- modules
-  integer(I4B),intent(in) :: iv
-  character(len=*),intent(in) :: message
-! ------------------------------------------------------------------------------
-  if(iv<=iverbose) then
-    write(iout,'(a)') message
-  endif
-end subroutine sim_message
-
+! -- this subroutine prints final messages and then stops with the active
+!    error code.
 subroutine ustop(stopmess, ioutlocal)
 ! ******************************************************************************
 ! Stop program, with option to print message before stopping.
@@ -532,54 +322,77 @@ subroutine ustop(stopmess, ioutlocal)
 ! ------------------------------------------------------------------------------
   ! -- dummy
   character, optional, intent(in) :: stopmess*(*)
-  integer(I4B),   optional, intent(in) :: ioutlocal
+  integer(I4B), optional, intent(in) :: ioutlocal
+  
+  !---------------------------------------------------------------------------
+  !
+  ! -- print the final message
+  call print_final_message(stopmess, ioutlocal)
+  !
+  ! -- return appropriate error codes when terminating the program
+  call stop_with_error(ireturnerr)
+  
+end subroutine ustop
+
+subroutine print_final_message(stopmess, ioutlocal)
+! ******************************************************************************
+! Print a final message and close all open files
+! ******************************************************************************
+!
+!    SPECIFICATIONS:
+! ------------------------------------------------------------------------------
+  ! -- dummy
+  character, optional, intent(in) :: stopmess*(*)
+  integer(I4B),   optional, intent(in) :: ioutlocal  
   ! -- local
   character(len=*), parameter :: fmt = '(1x,a)'
   character(len=*), parameter :: msg = 'Stopping due to error(s)'
-  logical :: errorfound
   !---------------------------------------------------------------------------
-  call print_notes()
-  call print_warnings()
-  errorfound = print_errors()
+  !
+  ! -- print the accumulated messages
+  call sim_notes%print_message('NOTES:', 'note(s)',                              &
+                               iunit=iout, level=VALL)
+  call sim_warnings%print_message('WARNING REPORT:', 'warning(s)',               &
+                                  iunit=iout, level=VALL)
+  call sim_errors%print_message('ERROR REPORT:', 'error(s)', iunit=iout)
+  call sim_uniterrors%print_message('UNIT ERROR REPORT:',                        &
+                                    'file unit error(s)', iunit=iout)
+  !
+  ! -- write a stop message, if one is passed 
   if (present(stopmess)) then
     if (stopmess.ne.' ') then
-      write(*,fmt) stopmess
-      write(iout,fmt) stopmess
+      call sim_message(stopmess, fmt=fmt, iunit=iout)
+      call sim_message(stopmess, fmt=fmt)
       if (present(ioutlocal)) then
-        if (ioutlocal > 0 .and. ioutlocal .ne. iout) then
+        if (ioutlocal > 0 .and. ioutlocal /= iout) then
           write(ioutlocal,fmt) trim(stopmess)
-          close(ioutlocal)
+          close (ioutlocal)
         endif
       endif
     endif
   endif
   !
-  if (errorfound) then
+  ! -- determine if an error condition has occurred
+  if (sim_errors%count_message() > 0) then
     ireturnerr = 2
-    write(*,fmt) msg
-    if (iout > 0) write(iout,fmt) msg
+    if (iout > 0) then
+      call sim_message(stopmess, fmt=fmt, iunit=iout)
+    end if
+    call sim_message(stopmess, fmt=fmt)
+    
     if (present(ioutlocal)) then
       if (ioutlocal > 0 .and. ioutlocal /= iout) write(ioutlocal,fmt) msg
     endif
   endif
   !
-  ! -- close iout file
-  close(iout)
+  ! -- close all open files
+  call sim_closefiles()
   !
-  ! -- return appropriate error codes when terminating the program
-  select case (ireturnerr)
-    case (0)
-      stop
-    case (1)
-      stop 1
-    case (2)
-      stop 2
-    case default
-      stop 999
-  end select
-end subroutine ustop
+  ! -- return
+  return
+end subroutine print_final_message
 
-  subroutine converge_reset()
+subroutine converge_reset()
 ! ******************************************************************************
 ! converge_reset
 ! ******************************************************************************
@@ -596,9 +409,9 @@ end subroutine ustop
     return
   end subroutine converge_reset
 
-  subroutine converge_check(exit_tsloop)
+  subroutine converge_check(hasConverged)
 ! ******************************************************************************
-! converge_check
+! convergence check
 ! ******************************************************************************
 !
 !    SPECIFICATIONS:
@@ -606,7 +419,7 @@ end subroutine ustop
     ! -- modules
     use SimVariablesModule, only: isimcnvg, numnoconverge, isimcontinue
     ! -- dummy
-    logical, intent(inout) :: exit_tsloop
+    logical, intent(inout) :: hasConverged
     ! -- format
     character(len=*), parameter :: fmtfail =                                   &
       "(1x, 'Simulation convergence failure.',                                 &
@@ -614,10 +427,12 @@ end subroutine ustop
 ! ------------------------------------------------------------------------------
     !
     ! -- Initialize
-    exit_tsloop = .false.
+    hasConverged = .true.
     !
     ! -- Count number of failures
-    if(isimcnvg == 0) numnoconverge = numnoconverge + 1
+    if(isimcnvg == 0) then
+      numnoconverge = numnoconverge + 1
+    end if
     !
     ! -- Continue if 'CONTINUE' specified in simulation control file
     if(isimcontinue == 1) then
@@ -628,8 +443,9 @@ end subroutine ustop
     !
     ! --
     if(isimcnvg == 0) then
-      write(iout, fmtfail)
-      exit_tsloop = .true.
+      !write(iout, fmtfail)
+      call sim_message('', fmt=fmtfail, iunit=iout)
+      hasConverged = .false.
     endif
     !
     ! -- Return
@@ -638,13 +454,16 @@ end subroutine ustop
 
   subroutine final_message()
 ! ******************************************************************************
-! final_message
+! Create the appropriate final message and terminate the program
 ! ******************************************************************************
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
+    ! -- dummy
     use SimVariablesModule, only: isimcnvg, numnoconverge, ireturnerr
+    ! -- local
+    character(len=LINELENGTH) :: line
     ! -- formats
     character(len=*), parameter :: fmtnocnvg =                                 &
       "(1x, 'Simulation convergence failure occurred ', i0, ' time(s).')"
@@ -652,19 +471,57 @@ end subroutine ustop
     !
     ! -- Write message if any nonconvergence
     if(numnoconverge > 0) then
-      write(*, fmtnocnvg) numnoconverge
-      write(iout, fmtnocnvg) numnoconverge
+      write(line, fmtnocnvg) numnoconverge
+      call sim_message(line, iunit=iout)
+      call sim_message(line)
     endif
     !
     if(isimcnvg == 0) then
       ireturnerr = 1
-      call ustop('Premature termination of simulation.', iout)
+      call print_final_message('Premature termination of simulation.', iout)
     else
-      call ustop('Normal termination of simulation.', iout)
+      call print_final_message('Normal termination of simulation.', iout)
     endif
     !
-    ! -- Return
-    return
+    ! -- Return or halt
+    if (iforcestop == 1) then
+      call stop_with_error(ireturnerr)
+    end if
+    
   end subroutine final_message
-
+  
+  subroutine sim_closefiles()
+! ******************************************************************************
+! Close all opened files.
+! ******************************************************************************
+!
+!    SPECIFICATIONS:
+! ------------------------------------------------------------------------------
+    ! -- modules
+    implicit none
+    ! -- dummy
+    ! -- local
+    integer(I4B) :: i
+    logical :: opened
+! ------------------------------------------------------------------------------
+    !
+    ! -- close all open file units
+    do i = iustart, iunext - 1
+      !
+      ! -- determine if file unit i is open
+      inquire(unit=i, opened=opened)
+      !
+      ! -- skip file units that are no longer open
+      if(.not. opened) then
+        cycle
+      end if
+      !
+      ! -- close file unit i
+      close(i)
+    end do
+    !
+    ! -- return
+    return
+  end subroutine sim_closefiles
+  
 end module SimModule

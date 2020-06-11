@@ -1,10 +1,12 @@
 module GwfGwfExchangeModule
 
   use KindModule, only: DP, I4B
+  use SimVariablesModule, only: errmsg
   use ArrayHandlersModule,     only: ExpandArray
   use BaseModelModule,         only: GetBaseModelFromList
   use BaseExchangeModule,      only: BaseExchangeType, AddBaseExchangeToList
-  use ConstantsModule,         only: LENBOUNDNAME, NAMEDBOUNDFLAG
+  use ConstantsModule,         only: LENBOUNDNAME, NAMEDBOUNDFLAG, LINELENGTH, &
+                                     TABCENTER, TABLEFT
   use ListsModule,             only: basemodellist
   use NumericalExchangeModule, only: NumericalExchangeType
   use NumericalModelModule,    only: NumericalModelType
@@ -16,6 +18,7 @@ module GwfGwfExchangeModule
   use SimModule,               only: count_errors, store_error,                &
                                      store_error_unit, ustop
   use BlockParserModule,       only: BlockParserType
+  use TableModule,             only: TableType, table_cr
 
   implicit none
 
@@ -46,7 +49,13 @@ module GwfGwfExchangeModule
     type(ObsType), pointer                           :: obs         => null()    ! observation object
     character(len=LENBOUNDNAME), dimension(:),                                  &
                                  pointer, contiguous :: boundname   => null()    ! boundnames
+    !
+    ! -- table objects
+    type(TableType), pointer :: outputtab1 => null()
+    type(TableType), pointer :: outputtab2 => null()
+
   contains
+
     procedure          :: exg_df      => gwf_gwf_df
     procedure          :: exg_ac      => gwf_gwf_ac
     procedure          :: exg_mc      => gwf_gwf_mc
@@ -304,7 +313,6 @@ contains
     real(DP) :: csat
     real(DP) :: fawidth
     real(DP), dimension(3) :: vg
-    character(len=LINELENGTH) :: errmsg
 ! ------------------------------------------------------------------------------
     !
     ! -- If mover is active, then call ar routine
@@ -315,9 +323,9 @@ contains
     !    GWF-GWF exchange (this%ianglex > 0).
     if(this%gwfmodel1%npf%ik22 /= 0 .or. this%gwfmodel2%npf%ik22 /= 0) then
       if(this%ianglex == 0) then
-        write(errmsg, '(a)') 'Error.  GWF-GWF requires that ANGLDEGX be ' //   &
-                             'specified as an auxiliary variable because ' //  &
-                             'K22 was specified in one or both ' // &
+        write(errmsg, '(a)') 'GWF-GWF requires that ANGLDEGX be ' //             &
+                             'specified as an auxiliary variable because ' //    &
+                             'K22 was specified in one or both ' //              &
                              'groundwater models.'
         call store_error(errmsg)
         call ustop()
@@ -330,17 +338,17 @@ contains
     if(this%gwfmodel1%npf%icalcspdis /= 0 .or. &
        this%gwfmodel2%npf%icalcspdis /= 0) then
       if(this%ianglex == 0) then
-        write(errmsg, '(a)') 'Error.  GWF-GWF requires that ANGLDEGX be ' //   &
-                             'specified as an auxiliary variable because ' //  &
-                             'specific discharge is being calculated in' // &
+        write(errmsg, '(a)') 'GWF-GWF requires that ANGLDEGX be ' //             &
+                             'specified as an auxiliary variable because ' //    &
+                             'specific discharge is being calculated in' //      &
                              ' one or both groundwater models.'
         call store_error(errmsg)
         call ustop()
       endif
       if(this%icdist == 0) then
-        write(errmsg, '(a)') 'Error.  GWF-GWF requires that CDIST be ' //   &
-                             'specified as an auxiliary variable because ' //  &
-                             'specific discharge is being calculated in' // &
+        write(errmsg, '(a)') 'GWF-GWF requires that CDIST be ' //                &
+                             'specified as an auxiliary variable because ' //    &
+                             'specific discharge is being calculated in' //      &
                              ' one or both groundwater models.'
         call store_error(errmsg)
         call ustop()
@@ -449,7 +457,7 @@ contains
     return
   end subroutine gwf_gwf_rp
 
-  subroutine gwf_gwf_ad(this, isolnid, kpicard, isubtime)
+  subroutine gwf_gwf_ad(this)
 ! ******************************************************************************
 ! gwf_gwf_ad -- Initialize package x values to zero for explicit exchanges
 ! ******************************************************************************
@@ -459,16 +467,13 @@ contains
     ! -- modules
     ! -- dummy
     class(GwfExchangeType) :: this
-    integer(I4B), intent(in) :: isolnid
-    integer(I4B), intent(in) :: kpicard
-    integer(I4B), intent(in) :: isubtime
     ! -- local
 ! ------------------------------------------------------------------------------
     !
     ! -- Advance mover
     if(this%inmvr > 0) call this%mvr%mvr_ad()
     !
-    ! -- Push simulated values to preceding time/subtime step
+    ! -- Push simulated values to preceding time step
     call this%obs%obs_ad()
     !
     ! -- Return
@@ -841,22 +846,56 @@ contains
     character(len=LENPACKAGENAME+4) :: packname1
     character(len=LENPACKAGENAME+4) :: packname2
     character(len=LENBUDTXT), dimension(1) :: budtxt
+    character(len=20) :: nodestr
+    integer(I4B) :: ntabrows
+    integer(I4B) :: nodeu
     real(DP), dimension(2, 1) :: budterm
     integer(I4B) :: i, n1, n2, n1u, n2u
     integer(I4B) :: ibinun1, ibinun2
-    integer(I4B) :: ibdlbl
     integer(I4B) :: icbcfl, ibudfl
     real(DP) :: ratin, ratout, rrate, deltaqgnc
     ! -- formats
-    character(len=*), parameter :: fmttkk =                                    &
-      "(1X,/1X,A,'   PERIOD ',I0,'   STEP ',I0)"
 ! ------------------------------------------------------------------------------
     !
+    ! -- initialize local variables
     budtxt(1) = '    FLOW-JA-FACE'
     packname1 = 'EXG '//this%name
     packname1 = adjustr(packname1)
     packname2 = 'EXG '//this%name
     packname2 = adjustr(packname2)
+    !
+    ! -- update output tables
+    if (this%iprflow /= 0) then
+      !
+      ! -- update titles
+      if (this%gwfmodel1%oc%oc_save('BUDGET')) then
+        call this%outputtab1%set_title(packname1)
+      end if
+      if (this%gwfmodel2%oc%oc_save('BUDGET')) then 
+        call this%outputtab2%set_title(packname2)
+      end if
+      !
+      ! -- set table kstp and kper
+      call this%outputtab1%set_kstpkper(kstp, kper)
+      call this%outputtab2%set_kstpkper(kstp, kper)
+      !
+      ! -- update maxbound of tables
+      ntabrows = 0
+      do i = 1, this%nexg
+        n1 = this%nodem1(i)
+        n2 = this%nodem2(i)
+        !
+        ! -- If both cells are active then calculate flow rate
+        if (this%gwfmodel1%ibound(n1) /= 0 .and.                                  &
+            this%gwfmodel2%ibound(n2) /= 0) then
+          ntabrows = ntabrows + 1
+        end if
+      end do
+      if (ntabrows > 0) then
+        call this%outputtab1%set_maxbound(ntabrows)
+        call this%outputtab2%set_maxbound(ntabrows)
+      end if
+    end if
     !
     ! -- Print and write budget terms for model 1
     !
@@ -886,7 +925,6 @@ contains
     ! Initialize accumulators
     ratin = DZERO
     ratout = DZERO
-    ibdlbl = 0
     !
     ! -- Loop through all exchanges
     do i = 1, this%nexg
@@ -917,12 +955,13 @@ contains
         ! -- Print the individual rates to model list files if requested
         if(this%iprflow /= 0) then
           if(this%gwfmodel1%oc%oc_save('BUDGET')) then
-            if(ibdlbl == 0) write(this%gwfmodel1%iout,fmttkk) packname1,       &
-                kper, kstp
-            call this%gwfmodel1%dis%print_list_entry(i, n1, rrate,             &
-                this%gwfmodel1%iout, bname)
-          endif
-          ibdlbl = 1
+            !
+            ! -- set nodestr and write outputtab table
+            nodeu = this%gwfmodel1%dis%get_nodeuser(n1)
+            call this%gwfmodel1%dis%nodeu_to_string(nodeu, nodestr)
+            call this%outputtab1%print_list_entry(i, trim(adjustl(nodestr)),     &
+                                                  rrate, bname)
+          end if
         endif
         if(rrate < DZERO) then
           ratout = ratout - rrate
@@ -974,7 +1013,6 @@ contains
     ! Initialize accumulators
     ratin = DZERO
     ratout = DZERO
-    ibdlbl = 0
     !
     ! -- Loop through all exchanges
     do i = 1, this%nexg
@@ -1005,12 +1043,13 @@ contains
         ! -- Print the individual rates to model list files if requested
         if(this%iprflow /= 0) then
           if(this%gwfmodel2%oc%oc_save('BUDGET')) then
-            if(ibdlbl == 0) write(this%gwfmodel2%iout,fmttkk) packname2,       &
-                kper, kstp
-            call this%gwfmodel2%dis%print_list_entry(i, n2, -rrate,            &
-                this%gwfmodel2%iout, bname)
-          endif
-          ibdlbl = 1
+            !
+            ! -- set nodestr and write outputtab table
+            nodeu = this%gwfmodel2%dis%get_nodeuser(n2)
+            call this%gwfmodel2%dis%nodeu_to_string(nodeu, nodestr)
+            call this%outputtab2%print_list_entry(i, trim(adjustl(nodestr)),     &
+                                                  -rrate, bname)
+          end if
         endif
         if(rrate < DZERO) then
           ratout = ratout - rrate
@@ -1132,17 +1171,27 @@ contains
 ! ------------------------------------------------------------------------------
     ! -- modules
     use ArrayHandlersModule, only: ifind
-    use ConstantsModule, only: LINELENGTH, DEM6
+    use ConstantsModule, only: LINELENGTH, LENAUXNAME, DEM6
+    use MemoryManagerModule, only: mem_allocate
     use InputOutputModule, only: getunit, openfile, urdaux
     use SimModule, only: store_error, store_error_unit, ustop
     ! -- dummy
     class(GwfExchangeType) :: this
     integer(I4B), intent(in) :: iout
     ! -- local
-    character(len=LINELENGTH) :: line, errmsg, keyword, fname
-    integer(I4B) :: istart,istop,lloc,ierr,ival
+    character(len=LINELENGTH) :: line
+    character(len=LINELENGTH) :: keyword
+    character(len=LINELENGTH) :: fname
+    character(len=LENAUXNAME), dimension(:), allocatable :: caux
+    logical :: isfound
+    logical :: endOfBlock
+    integer(I4B) :: istart
+    integer(I4B) :: istop
+    integer(I4B) :: lloc
+    integer(I4B) :: ierr
+    integer(I4B) :: ival
     integer(I4B) :: inobs
-    logical :: isfound, endOfBlock
+    integer(I4B) :: n
 ! ------------------------------------------------------------------------------
     !
     ! -- get options block
@@ -1154,21 +1203,33 @@ contains
       write(iout,'(1x,a)')'PROCESSING GWF EXCHANGE OPTIONS'
       do
         call this%parser%GetNextLine(endOfBlock)
-        if (endOfBlock) exit
+        if (endOfBlock) then
+          exit
+        end if
         call this%parser%GetStringCaps(keyword)
         select case (keyword)
           case('AUXILIARY')
             call this%parser%GetRemainingLine(line)
             lloc = 1
-            call urdaux(this%naux, this%parser%iuactive, iout, lloc, istart,   &
-                        istop, this%auxname, line, 'GWF_GWF_Exchange')
+            call urdaux(this%naux, this%parser%iuactive, iout, lloc, istart,     &
+                        istop, caux, line, 'GWF_GWF_Exchange')
+            call mem_allocate(this%auxname, LENAUXNAME, this%naux,               &
+                                'AUXNAME', trim(this%name))
+            do n = 1, this%naux
+              this%auxname(n) = caux(n)
+            end do
+            deallocate(caux)
             !
             ! -- If ANGLDEGX is an auxiliary variable, then anisotropy can be
             !    used in either model.  Store ANGLDEGX position in this%ianglex
             ival = ifind(this%auxname, 'ANGLDEGX')
-            if(ival > 0) this%ianglex = ival
+            if (ival > 0) then
+              this%ianglex = ival
+            end if
             ival = ifind(this%auxname, 'CDIST')
-            if(ival > 0) this%icdist = ival
+            if(ival > 0) then
+              this%icdist = ival
+            end if
           case ('PRINT_INPUT')
             this%iprpak = 1
             write(iout,'(4x,a)') &
@@ -1189,8 +1250,7 @@ contains
             case('AMT-LMK')
               this%icellavg = 2
             case default
-              write(errmsg,'(4x,a,a)')'UNKNOWN CELL AVERAGING METHOD: ',       &
-                                       trim(keyword)
+              errmsg = "Unknown cell averaging method '" // trim(keyword) // "'."
               call store_error(errmsg)
               call this%parser%StoreErrorUnit()
               call ustop()
@@ -1266,14 +1326,13 @@ contains
             call openfile(inobs, iout, this%obs%inputFilename, 'OBS')
             this%obs%inUnitObs = inobs
           case default
-            write(errmsg,'(4x,a,a)')'***ERROR. UNKNOWN GWF EXCHANGE OPTION: ', &
-                                     trim(keyword)
+            errmsg = "Unknown gwf exchange option '" // trim(keyword) // "'."
             call store_error(errmsg)
             call this%parser%StoreErrorUnit()
             call ustop()
         end select
       end do
-      write(iout,'(1x,a)')'END OF GWF EXCHANGE OPTIONS'
+      write(iout,'(1x,a)') 'END OF GWF EXCHANGE OPTIONS'
     end if
     !
     ! -- set omega value used for saturation calculations
@@ -1300,7 +1359,7 @@ contains
     class(GwfExchangeType) :: this
     integer(I4B), intent(in) :: iout
     ! -- local
-    character(len=LINELENGTH) :: errmsg, nodestr, node1str, node2str, cellid
+    character(len=LINELENGTH) :: nodestr, node1str, node2str, cellid
     character(len=2) :: cnfloat
     integer(I4B) :: lloc, ierr, nerr, iaux
     integer(I4B) :: iexg, nodem1, nodem2, nodeum1, nodeum2
@@ -1386,20 +1445,20 @@ contains
         ! -- Check to see if nodem1 is outside of active domain
         if(nodem1 <= 0) then
           call this%gwfmodel1%dis%nodeu_to_string(nodeum1, nodestr)
-          write(errmsg, *)                                                     &
-                  trim(adjustl(this%gwfmodel1%name)) //                        &
-                  ' Cell is outside active grid domain: ' //                   &
-                  trim(adjustl(nodestr))
+          write(errmsg, *)                                                       &
+                  trim(adjustl(this%gwfmodel1%name)) //                          &
+                  ' Cell is outside active grid domain ' //                      &
+                  trim(adjustl(nodestr)) // '.'
           call store_error(errmsg)
         endif
         !
         ! -- Check to see if nodem2 is outside of active domain
         if(nodem2 <= 0) then
           call this%gwfmodel2%dis%nodeu_to_string(nodeum2, nodestr)
-          write(errmsg, *)                                                     &
-                  trim(adjustl(this%gwfmodel2%name)) //                        &
-                  ' Cell is outside active grid domain: ' //                   &
-                  trim(adjustl(nodestr))
+          write(errmsg, *)                                                       &
+                  trim(adjustl(this%gwfmodel2%name)) //                          &
+                  ' Cell is outside active grid domain ' //                      &
+                  trim(adjustl(nodestr)) // '.'
           call store_error(errmsg)
         endif
       enddo
@@ -1414,7 +1473,7 @@ contains
       !
       write(iout,'(1x,a)')'END OF EXCHANGEDATA'
     else
-      write(errmsg, '(1x,a)')'ERROR.  REQUIRED EXCHANGEDATA BLOCK NOT FOUND.'
+      errmsg = 'Required exchangedata block not found.'
       call store_error(errmsg)
       call this%parser%StoreErrorUnit()
       call ustop()
@@ -1439,7 +1498,6 @@ contains
     integer(I4B), intent(in) :: iout
     ! -- local
     integer(I4B) :: i, nm1, nm2, nmgnc1, nmgnc2
-    character(len=LINELENGTH) :: errmsg
     character(len=*), parameter :: fmterr = &
       "('EXCHANGE NODES ', i0, ' AND ', i0,"  // &
       "' NOT CONSISTENT WITH GNC NODES ', i0, ' AND ', i0)"
@@ -1504,8 +1562,14 @@ contains
     ! -- local
 ! ------------------------------------------------------------------------------
     !
-    ! -- Create and initialize the mover object
-    call mvr_cr(this%mvr, this%name, this%inmvr, iout, iexgmvr=1)
+    ! -- Create and initialize the mover object  Here, dis is set to the one
+    !    for gwfmodel1 so that a call to save flows has an associated dis
+    !    object.  Because the conversion flags for the mover are both false,
+    !    the dis object does not convert from reduced to user node numbers. 
+    !    So in this case, the dis object is just writing unconverted package
+    !    numbers to the binary budget file.
+    call mvr_cr(this%mvr, this%name, this%inmvr, iout, this%gwfmodel1%dis,     &
+                iexgmvr=1)
     !
     ! -- Return
     return
@@ -1743,6 +1807,26 @@ contains
     call this%obs%obs_da()
     deallocate(this%obs)
     !
+    ! -- arrays
+    call mem_deallocate(this%ihc)
+    call mem_deallocate(this%cl1)
+    call mem_deallocate(this%cl2)
+    call mem_deallocate(this%hwva)
+    call mem_deallocate(this%condsat)
+    deallocate(this%boundname)
+    !
+    ! -- output table objects
+    if (associated(this%outputtab1)) then
+      call this%outputtab1%table_da()
+      deallocate(this%outputtab1)
+      nullify(this%outputtab1)
+    end if
+    if (associated(this%outputtab2)) then
+      call this%outputtab2%table_da()
+      deallocate(this%outputtab2)
+      nullify(this%outputtab2)
+    end if
+    !
     ! -- scalars
     call mem_deallocate(this%icellavg)
     call mem_deallocate(this%ivarcv)
@@ -1755,14 +1839,6 @@ contains
     call mem_deallocate(this%inobs)
     call mem_deallocate(this%inamedbound)
     call mem_deallocate(this%satomega)
-    !
-    ! -- arrays
-    call mem_deallocate(this%ihc)
-    call mem_deallocate(this%cl1)
-    call mem_deallocate(this%cl2)
-    call mem_deallocate(this%hwva)
-    call mem_deallocate(this%condsat)
-    deallocate(this%boundname)
     !
     ! -- return
     return
@@ -1781,7 +1857,9 @@ contains
     ! -- dummy
     class(GwfExchangeType) :: this
     ! -- local
+    character(len=LINELENGTH) :: text
     character(len=LENORIGIN) :: origin
+    integer(I4B) :: ntabcol
 ! ------------------------------------------------------------------------------
     !
     ! -- create the origin name
@@ -1803,6 +1881,46 @@ contains
       allocate(this%boundname(1))
     endif
     this%boundname(:) = ''
+    !
+    ! -- allocate and initialize the output table
+    if (this%iprflow /= 0) then
+      !
+      ! -- dimension table
+      ntabcol = 3
+      if (this%inamedbound > 0) then
+        ntabcol = ntabcol + 1
+      end if
+      !
+      ! -- initialize the output table objects
+      !    outouttab1
+      call table_cr(this%outputtab1, this%name, '    ')
+      call this%outputtab1%table_df(this%nexg, ntabcol, this%gwfmodel1%iout,     &
+                                    transient=.TRUE.)
+      text = 'NUMBER'
+      call this%outputtab1%initialize_column(text, 10, alignment=TABCENTER)
+      text = 'CELLID'
+      call this%outputtab1%initialize_column(text, 20, alignment=TABLEFT)
+      text = 'RATE'
+      call this%outputtab1%initialize_column(text, 15, alignment=TABCENTER)
+      if (this%inamedbound > 0) then
+        text = 'NAME'
+        call this%outputtab1%initialize_column(text, 20, alignment=TABLEFT)
+      end if
+      !    outouttab2
+      call table_cr(this%outputtab2, this%name, '    ')
+      call this%outputtab2%table_df(this%nexg, ntabcol, this%gwfmodel2%iout,     &
+                                    transient=.TRUE.)
+      text = 'NUMBER'
+      call this%outputtab2%initialize_column(text, 10, alignment=TABCENTER)
+      text = 'CELLID'
+      call this%outputtab2%initialize_column(text, 20, alignment=TABLEFT)
+      text = 'RATE'
+      call this%outputtab2%initialize_column(text, 15, alignment=TABCENTER)
+      if (this%inamedbound > 0) then
+        text = 'NAME'
+        call this%outputtab2%initialize_column(text, 20, alignment=TABLEFT)
+      end if
+    end if
     !
     ! -- return
     return

@@ -1,8 +1,8 @@
 module ChdModule
   !
   use KindModule,           only: DP, I4B
-  use ConstantsModule,      only: DZERO, DONE, NAMEDBOUNDFLAG, LENFTYPE,       &
-                             LENPACKAGENAME
+  use ConstantsModule,      only: DZERO, DONE, NAMEDBOUNDFLAG, LENFTYPE,         &
+                                  LINELENGTH, LENPACKAGENAME
   use ObsModule,            only: DefaultObsIdProcessor
   use BndModule,            only: BndType
   use ObserveModule,        only: ObserveType
@@ -90,10 +90,12 @@ contains
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     use SimModule, only: ustop, store_error
-    implicit none
+    ! -- dummy
     class(ChdType), intent(inout) :: this
-    integer(I4B) :: i, node, ibd, ierr
+    ! -- local
+    character(len=LINELENGTH) :: errmsg
     character(len=30) :: nodestr
+    integer(I4B) :: i, node, ibd, ierr
 ! ------------------------------------------------------------------------------
     !
     ! -- Reset previous CHDs to active cell
@@ -112,8 +114,9 @@ contains
       ibd = this%ibound(node)
       if(ibd < 0) then
         call this%dis%noder_to_string(node, nodestr)
-        call store_error('Error.  Cell is already a constant head: ' &
-                         // trim(adjustl(nodestr)))
+        write(errmsg, '(3a)')                                                    &
+          'Cell is already a constant head (', trim(adjustl(nodestr)), ').'
+        call store_error(errmsg)
         ierr = ierr + 1
       else
         this%ibound(node) = -this%ibcnum
@@ -241,7 +244,7 @@ contains
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
-    use TdisModule, only: kstp, kper, delt
+    use TdisModule, only: delt, kstp, kper
     use ConstantsModule, only: LENBOUNDNAME
     use BudgetModule, only: BudgetType
     ! -- dummy
@@ -257,9 +260,11 @@ contains
     integer(I4B), dimension(:), optional, intent(in) :: imap
     integer(I4B), optional, intent(in) :: iadv
     ! -- local
+    character(len=20) :: nodestr
+    integer(I4B) :: nodeu
     integer(I4B) :: i, node, ibinun, n2
     real(DP) :: rrate, chin, chout, q
-    integer(I4B) :: ibdlbl, naux, ipos
+    integer(I4B) :: naux, ipos
     ! -- for observations
     character(len=LENBOUNDNAME) :: bname
     ! -- formats
@@ -267,9 +272,9 @@ contains
       "(1X,/1X,A,'   PERIOD ',I0,'   STEP ',I0)"
 ! ------------------------------------------------------------------------------
     !
+    ! -- initialize local variables
     chin = DZERO
     chout = DZERO
-    ibdlbl = 0
     !
     ! -- Set unit number for binary output
     if(this%ipakcb < 0) then
@@ -291,6 +296,12 @@ contains
     !
     ! -- If no boundaries, skip flow calculations.
     if(this%nbound > 0) then
+      !
+      ! -- set kstp and kper and reset size of table
+      if (this%iprflow /= 0) then
+        call this%outputtab%set_kstpkper(kstp, kper)
+        call this%outputtab%set_maxbound(this%nbound)
+      end if
       !
       ! -- Loop through each boundary calculating flow.
       do i = 1, this%nbound
@@ -327,11 +338,11 @@ contains
         ! -- Print the individual rates if requested(this%iprflow<0)
         if (ibudfl /= 0) then
           if(this%iprflow /= 0) then
-                if(ibdlbl == 0) write(this%iout,fmttkk)                        &
-                  this%text // ' (' // trim(this%name) // ')', kper, kstp
-            call this%dis%print_list_entry(i, node, rrate, this%iout,          &
-                    bname)
-            ibdlbl=1
+            !
+            ! -- set nodestr and write outputtab table
+            nodeu = this%dis%get_nodeuser(node)
+            call this%dis%nodeu_to_string(nodeu, nodestr)
+            call this%outputtab%print_list_entry(i, nodestr, rrate, bname)
           end if
         end if
         !

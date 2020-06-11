@@ -21,7 +21,6 @@ module MvrModule
     integer(I4B)                                 :: imvrtype = 0                 !mover type (1, 2, 3, 4) corresponds to mvrtypes
     real(DP)                                     :: value = DZERO                !factor or rate depending on mvrtype
     real(DP)                                     :: qpold = DZERO                !provider rate from last time step
-    real(DP)                                     :: qpnew = DZERO                !new provider rate
     real(DP)                                     :: qpactual = DZERO             !rate provided to the receiver
     real(DP)                                     :: qanew = DZERO                !rate available at time of providing
     real(DP)                                     :: qaold = DZERO                !rate available fromtime step
@@ -201,7 +200,7 @@ module MvrModule
     ! -- Set pointer to QFROMMVR array in the receiver boundary package
     temp_ptr => pakmovers(ipakloc2)%qfrommvr
     if(this%irch2 < 1 .or. this%irch2 > size(temp_ptr)) then
-      call store_error('ERROR. PROVIDER ID < 1 OR GREATER THAN PACKAGE SIZE ')
+      call store_error('ERROR. RECEIVER ID < 1 OR GREATER THAN PACKAGE SIZE ')
       write(errmsg, '(4x,a,i0,a,i0)') 'RECEIVER ID = ', this%irch2,            &
         '; PACKAGE SIZE = ', size(temp_ptr)
       call store_error(trim(errmsg))

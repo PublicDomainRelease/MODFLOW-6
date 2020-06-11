@@ -1,4 +1,4 @@
-# makefile created on 2019-12-12 13:31:04.803316
+# makefile created on 2020-06-11 17:48:22.733501
 # by pymake (version 1.1.0)
 # using the gfortran fortran and gcc c/c++ compilers.
 
@@ -19,30 +19,32 @@ ${SOURCEDIR2}
 
 # Define the Fortran compile flags
 FC = gfortran
-FFLAGS = -O2 -fbacktrace 
+FFLAGS = -O2 -fbacktrace -Bstatic -D_WIN32 -MMD -cpp 
 
 # Define the C compile flags
 CC = gcc
-CFLAGS = -O2 -D_UF 
+CFLAGS = -O2 -Bstatic -D_UF -MMD -cpp 
 
 # Define the libraries
-SYSLIBS = 
+SYSLIBS = -lgfortran -lm 
 
 OBJECTS = \
 $(OBJDIR)/OpenSpec.o \
 $(OBJDIR)/kind.o \
+$(OBJDIR)/version.o \
 $(OBJDIR)/Constants.o \
 $(OBJDIR)/SimVariables.o \
+$(OBJDIR)/defmacro.o \
 $(OBJDIR)/genericutils.o \
-$(OBJDIR)/version.o \
 $(OBJDIR)/ArrayHandlers.o \
+$(OBJDIR)/Message.o \
 $(OBJDIR)/Sim.o \
-$(OBJDIR)/Budget.o \
-$(OBJDIR)/budgetdata.o \
-$(OBJDIR)/sort.o \
 $(OBJDIR)/InputOutput.o \
-$(OBJDIR)/BlockParser.o \
 $(OBJDIR)/ArrayReaders.o \
+$(OBJDIR)/sort.o \
+$(OBJDIR)/budgetdata.o \
+$(OBJDIR)/Budget.o \
+$(OBJDIR)/BlockParser.o \
 $(OBJDIR)/grb.o \
 $(OBJDIR)/zone.o \
 $(OBJDIR)/zoneoutput.o \
@@ -64,30 +66,43 @@ $(PROGRAM) : $(OBJECTS)
 $(OBJDIR)/%.o : %.f
 	@mkdir -p $(@D)
 	$(FC) $(FFLAGS) -c $< -o $@ -I$(OBJDIR) -J$(OBJDIR) 
+	cat ./obj_temp/$*.d >> Dependencies
+	rm -f $*.d
 
 $(OBJDIR)/%.o : %.f90
 	@mkdir -p $(@D)
 	$(FC) $(FFLAGS) -c $< -o $@ -I$(OBJDIR) -J$(OBJDIR) 
+	cat ./obj_temp/$*.d >> Dependencies
+	rm -f $*.d
 
 $(OBJDIR)/%.o : %.F90
 	@mkdir -p $(@D)
 	$(FC) $(FFLAGS) -c $< -o $@ -I$(OBJDIR) -J$(OBJDIR) 
+	cat ./obj_temp/$*.d >> Dependencies
+	rm -f $*.d
 
 $(OBJDIR)/%.o : %.fpp
 	@mkdir -p $(@D)
 	$(FC) $(FFLAGS) -c $< -o $@ -I$(OBJDIR) -J$(OBJDIR) 
+	cat ./obj_temp/$*.d >> Dependencies
+	rm -f $*.d
 
 $(OBJDIR)/%.o : %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
+	cat ./obj_temp/$*.d >> Dependencies
+	rm -f $*.d
 
 $(OBJDIR)/%.o : %.cpp
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
+	cat ./obj_temp/$*.d >> Dependencies
+	rm -f $*.d
 
 # Clean the object and module files and the executable
 .PHONY : clean
 clean : 
+	-rm -r Dependencies
 	-rm -rf $(OBJDIR)
 	-rm -rf $(PROGRAM)
 
@@ -95,4 +110,8 @@ clean :
 .PHONY : cleanobj
 cleanobj : 
 	-rm -rf $(OBJDIR)
+
+# Touch dependencies
+Dependencies : 
+	touch Dependencies
 

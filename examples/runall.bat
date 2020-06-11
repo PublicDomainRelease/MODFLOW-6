@@ -142,4 +142,8 @@ cd ex36-csub-subwt01
 ..\..\bin\mf6.exe
 cd ..
 
+cd ex37-draindepth
+..\..\bin\mf6.exe
+cd ..
+
 pause

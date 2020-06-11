@@ -3,16 +3,17 @@ module SimulationCreateModule
   use KindModule,             only: DP, I4B, write_kindinfo
   use ConstantsModule,        only: LINELENGTH, LENMODELNAME, LENBIGLINE, DZERO
   use SimVariablesModule,     only: simfile, simlstfile, iout
-  use SimModule,              only: ustop, store_error, count_errors,          &
-                                    store_error_unit, maxerrors
+  use GenericUtilitiesModule, only: sim_message, write_centered
+  use SimModule,              only: ustop, store_error, count_errors,            &
+                                    store_error_unit, MaxErrors
   use InputOutputModule,      only: getunit, urword, openfile
   use ArrayHandlersModule,    only: expandarray, ifind
   use BaseModelModule,        only: BaseModelType
-  use BaseSolutionModule,     only: BaseSolutionType, AddBaseSolutionToList,   &
+  use BaseSolutionModule,     only: BaseSolutionType, AddBaseSolutionToList,     &
                                     GetBaseSolutionFromList
   use SolutionGroupModule,    only: SolutionGroupType, AddSolutionGroupToList
   use BaseExchangeModule,     only: BaseExchangeType
-  use ListsModule,            only: basesolutionlist, basemodellist,           &
+  use ListsModule,            only: basesolutionlist, basemodellist,             &
                                     solutiongrouplist
   use BaseModelModule,        only: GetBaseModelFromList
   use BlockParserModule,      only: BlockParserType
@@ -37,13 +38,8 @@ module SimulationCreateModule
 ! ------------------------------------------------------------------------------
     ! -- modules
     ! -- local
-    !character(len=LINELENGTH) :: simfile
-    !character(len=LINELENGTH) :: simlstfile
+    character(len=LINELENGTH) :: line
 ! ------------------------------------------------------------------------------
-    !!
-    !! -- set default simfile and simlstfile
-    !simfile    = 'mfsim.nam'
-    !simlstfile = 'mfsim.lst'
     !
     ! -- initialize iout 
     iout = 0
@@ -51,8 +47,11 @@ module SimulationCreateModule
     ! -- Open simulation list file
     iout = getunit()
     call openfile(iout, 0, simlstfile, 'LIST', filstat_opt='REPLACE')
-    write(*,'(A,A)') ' Writing simulation list file: ', &
-                     trim(adjustl(simlstfile))
+    !
+    ! -- write simlstfile to stdout
+    write(line,'(2(1x,A))') 'Writing simulation list file:',                     &
+                            trim(adjustl(simlstfile))
+    call sim_message(line)
     call write_simulation_header()
     !
     ! -- Read the simulation name file and create objects
@@ -91,7 +90,7 @@ module SimulationCreateModule
     use VersionModule,          only: VERSION, MFVNAM, MFTITLE, FMTDISCLAIMER,  & 
                                       IDEVELOPMODE
     use CompilerVersion
-    use InputOutputModule,      only: write_centered
+    use GenericUtilitiesModule, only: write_centered
     ! -- dummy
     ! -- local
     character(len=LENBIGLINE) :: syscmd
@@ -99,17 +98,19 @@ module SimulationCreateModule
 ! ------------------------------------------------------------------------------
     !
     ! -- Write header lines to simulation list file.
-    call write_centered('MODFLOW'//MFVNAM, iout, 80)
-    call write_centered(MFTITLE, iout, 80)
-    call write_centered('VERSION '//VERSION, iout, 80)
+    call write_centered('MODFLOW'//MFVNAM, 80, iunit=iout)
+    call write_centered(MFTITLE, 80, iunit=iout)
+    call write_centered('VERSION '//VERSION, 80, iunit=iout)
     !
     ! -- Write if develop mode
-    if (IDEVELOPMODE == 1) call write_centered('***DEVELOP MODE***', iout, 80)
+    if (IDEVELOPMODE == 1) then
+      call write_centered('***DEVELOP MODE***', 80, iunit=iout)
+    end if
     !
     ! -- Write compiler version
     call get_compiler(compiler)
-    call write_centered(' ', iout, 80)
-    call write_centered(trim(adjustl(compiler)), iout, 80)
+    call write_centered(' ', 80, iunit=iout)
+    call write_centered(trim(adjustl(compiler)), 80, iunit=iout)
     !
     ! -- Write disclaimer
     write(iout, FMTDISCLAIMER)
@@ -140,6 +141,7 @@ module SimulationCreateModule
     ! -- dummy
     character(len=*),intent(in) :: simfile
     ! -- local
+    character(len=LINELENGTH) :: line
     character(len=LINELENGTH) :: errmsg
     class(BaseSolutionType), pointer :: sp
     class(BaseModelType), pointer :: mp
@@ -149,7 +151,10 @@ module SimulationCreateModule
     ! -- Open simulation name file
     inunit = getunit()
     call openfile(inunit, iout, simfile, 'NAM')
-    write(*,'(A,A)') ' Using Simulation name file: ', simfile
+    !
+    ! -- write simfile name to stdout
+    write(line,'(2(1x,a))') 'Using Simulation name file:', simfile
+    call sim_message(line, skipafter=1)
     !
     ! -- Initialize block parser
     call parser%Initialize(inunit, iout)
@@ -209,6 +214,7 @@ module SimulationCreateModule
     use SimVariablesModule, only: isimcontinue, isimcheck
     ! -- local
     integer(I4B) :: ierr
+    integer(I4B) :: imax
     logical :: isfound, endOfBlock
     character(len=LINELENGTH) :: errmsg
     character(len=LINELENGTH) :: keyword
@@ -242,9 +248,10 @@ module SimulationCreateModule
               call ustop()
             endif
           case ('MAXERRORS')
-            maxerrors = parser%GetInteger()
+            imax = parser%GetInteger()
+            call MaxErrors(imax)
             write(iout, '(4x, a, i0)')                                         &
-                  'MAXIMUM NUMBER OF ERRORS THAT WILL BE STORED IS ', maxerrors
+                  'MAXIMUM NUMBER OF ERRORS THAT WILL BE STORED IS ', imax
           case default
             write(errmsg, '(4x,a,a)') &
                   '****ERROR. UNKNOWN SIMULATION OPTION: ',                    &
