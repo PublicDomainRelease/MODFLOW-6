@@ -1,1 +1,0 @@
-The is Example 3 from the MODFLOW-LGR2 documentation.

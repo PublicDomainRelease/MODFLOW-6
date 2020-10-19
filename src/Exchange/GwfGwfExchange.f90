@@ -2,7 +2,6 @@ module GwfGwfExchangeModule
 
   use KindModule, only: DP, I4B
   use SimVariablesModule, only: errmsg
-  use ArrayHandlersModule,     only: ExpandArray
   use BaseModelModule,         only: GetBaseModelFromList
   use BaseExchangeModule,      only: BaseExchangeType, AddBaseExchangeToList
   use ConstantsModule,         only: LENBOUNDNAME, NAMEDBOUNDFLAG, LINELENGTH, &
@@ -99,6 +98,7 @@ contains
     use BaseModelModule, only: BaseModelType
     use ListsModule, only: baseexchangelist
     use ObsModule, only: obs_cr
+    use MemoryHelperModule, only: create_mem_path
     ! -- dummy
     character(len=*),intent(in) :: filename
     integer(I4B), intent(in) :: id, m1id, m2id
@@ -118,6 +118,7 @@ contains
     exchange%id = id
     write(cint, '(i0)') id
     exchange%name = 'GWF-GWF_' // trim(adjustl(cint))
+    exchange%memoryPath = create_mem_path(exchange%name)
     !
     ! -- allocate scalars and set defaults
     call exchange%allocate_scalars()
@@ -1179,7 +1180,7 @@ contains
     class(GwfExchangeType) :: this
     integer(I4B), intent(in) :: iout
     ! -- local
-    character(len=LINELENGTH) :: line
+    character(len=:), allocatable :: line
     character(len=LINELENGTH) :: keyword
     character(len=LINELENGTH) :: fname
     character(len=LENAUXNAME), dimension(:), allocatable :: caux
@@ -1214,7 +1215,7 @@ contains
             call urdaux(this%naux, this%parser%iuactive, iout, lloc, istart,     &
                         istop, caux, line, 'GWF_GWF_Exchange')
             call mem_allocate(this%auxname, LENAUXNAME, this%naux,               &
-                                'AUXNAME', trim(this%name))
+                                'AUXNAME', trim(this%memoryPath))
             do n = 1, this%naux
               this%auxname(n) = caux(n)
             end do
@@ -1738,30 +1739,26 @@ contains
 ! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_allocate
-    use ConstantsModule, only: LENORIGIN, DZERO
+    use ConstantsModule, only: DZERO
     ! -- dummy
     class(GwfExchangeType) :: this
     ! -- local
-    character(len=LENORIGIN) :: origin
 ! ------------------------------------------------------------------------------
-    !
-    ! -- create the origin name
-    origin = trim(this%name)
     !
     ! -- Call parent type allocate_scalars
     call this%NumericalExchangeType%allocate_scalars()
     !
-    call mem_allocate(this%icellavg, 'ICELLAVG', origin)
-    call mem_allocate(this%ivarcv, 'IVARCV', origin)
-    call mem_allocate(this%idewatcv, 'IDEWATCV', origin)
-    call mem_allocate(this%inewton, 'INEWTON', origin)
-    call mem_allocate(this%ianglex, 'IANGLEX', origin)
-    call mem_allocate(this%icdist, 'ICDIST', origin)
-    call mem_allocate(this%ingnc, 'INGNC', origin)
-    call mem_allocate(this%inmvr, 'INMVR', origin)
-    call mem_allocate(this%inobs, 'INOBS', origin)
-    call mem_allocate(this%inamedbound, 'INAMEDBOUND', origin)
-    call mem_allocate(this%satomega, 'SATOMEGA', origin)
+    call mem_allocate(this%icellavg, 'ICELLAVG', this%memoryPath)
+    call mem_allocate(this%ivarcv, 'IVARCV', this%memoryPath)
+    call mem_allocate(this%idewatcv, 'IDEWATCV', this%memoryPath)
+    call mem_allocate(this%inewton, 'INEWTON', this%memoryPath)
+    call mem_allocate(this%ianglex, 'IANGLEX', this%memoryPath)
+    call mem_allocate(this%icdist, 'ICDIST', this%memoryPath)
+    call mem_allocate(this%ingnc, 'INGNC', this%memoryPath)
+    call mem_allocate(this%inmvr, 'INMVR', this%memoryPath)
+    call mem_allocate(this%inobs, 'INOBS', this%memoryPath)
+    call mem_allocate(this%inamedbound, 'INAMEDBOUND', this%memoryPath)
+    call mem_allocate(this%satomega, 'SATOMEGA', this%memoryPath)
     this%icellavg = 0
     this%ivarcv = 0
     this%idewatcv = 0
@@ -1853,26 +1850,21 @@ contains
 ! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_allocate
-    use ConstantsModule, only: LENORIGIN
     ! -- dummy
     class(GwfExchangeType) :: this
     ! -- local
     character(len=LINELENGTH) :: text
-    character(len=LENORIGIN) :: origin
     integer(I4B) :: ntabcol
 ! ------------------------------------------------------------------------------
-    !
-    ! -- create the origin name
-    origin = trim(this%name)
     !
     ! -- Call parent type allocate_scalars
     call this%NumericalExchangeType%allocate_arrays()
     !
-    call mem_allocate(this%ihc, this%nexg, 'IHC', origin)
-    call mem_allocate(this%cl1, this%nexg, 'CL1', origin)
-    call mem_allocate(this%cl2, this%nexg, 'CL2', origin)
-    call mem_allocate(this%hwva, this%nexg, 'HWVA', origin)
-    call mem_allocate(this%condsat, this%nexg, 'CONDSAT', origin)
+    call mem_allocate(this%ihc, this%nexg, 'IHC', this%memoryPath)
+    call mem_allocate(this%cl1, this%nexg, 'CL1', this%memoryPath)
+    call mem_allocate(this%cl2, this%nexg, 'CL2', this%memoryPath)
+    call mem_allocate(this%hwva, this%nexg, 'HWVA', this%memoryPath)
+    call mem_allocate(this%condsat, this%nexg, 'CONDSAT', this%memoryPath)
     !
     ! -- Allocate boundname
     if(this%inamedbound==1) then
@@ -1963,7 +1955,8 @@ contains
     ! -- dummy
     class(GwfExchangeType) :: this
     ! -- local
-    integer(I4B) :: i, j, n
+    integer(I4B) :: i
+    integer(I4B) :: j
     class(ObserveType), pointer :: obsrv => null()
     character(len=LENBOUNDNAME) :: bname
     character(len=1000) :: ermsg
@@ -1973,16 +1966,13 @@ contains
            '" is invalid in package "',a,'"')
 ! ------------------------------------------------------------------------------
     !
-    do i=1,this%obs%npakobs
+    do i = 1, this%obs%npakobs
       obsrv => this%obs%pakobs(i)%obsrv
       !
-      ! -- indxbnds needs to be deallocated and reallocated (using
-      !    ExpandArray) each stress period because list of boundaries
-      !    can change each stress period.
+      ! -- indxbnds needs to be reset each stress period because 
+      !    list of boundaries can change each stress period.
       ! -- Not true for exchanges, but leave this in for now anyway.
-      if (allocated(obsrv%indxbnds)) then
-        deallocate(obsrv%indxbnds)
-      endif
+      call obsrv%ResetObsIndex()
       obsrv%BndFound = .false.
       !
       bname = obsrv%FeatureName
@@ -1996,9 +1986,7 @@ contains
             jfound = .true.
             obsrv%BndFound = .true.
             obsrv%CurrentTimeStepEndValue = DZERO
-            call ExpandArray(obsrv%indxbnds)
-            n = size(obsrv%indxbnds)
-            obsrv%indxbnds(n) = j
+            call obsrv%AddObsIndex(j)
           endif
         enddo
         if (.not. jfound) then
@@ -2011,15 +1999,14 @@ contains
           jfound = .true.
           obsrv%BndFound = .true.
           obsrv%CurrentTimeStepEndValue = DZERO
-          call ExpandArray(obsrv%indxbnds)
-          n = size(obsrv%indxbnds)
-          obsrv%indxbnds(n) = obsrv%intPak1
+          call obsrv%AddObsIndex(obsrv%intPak1)
         else
           jfound = .false.
         endif
       endif
     enddo
     !
+    ! -- write summary of error messages
     if (count_errors() > 0) then
       call store_error_unit(this%inobs)
       call ustop()
@@ -2111,7 +2098,10 @@ contains
     use ObserveModule, only: ObserveType
     class(GwfExchangeType), intent(inout) :: this
     ! -- local
-    integer(I4B) :: i, j, n1, n2, nbndobs
+    integer(I4B) :: i
+    integer(I4B) :: j
+    integer(I4B) :: n1
+    integer(I4B) :: n2
     integer(I4B) :: iexg
     real(DP) :: v
     character(len=100) :: msg
@@ -2123,8 +2113,7 @@ contains
       call this%obs%obs_bd_clear()
       do i = 1, this%obs%npakobs
         obsrv => this%obs%pakobs(i)%obsrv
-        nbndobs = size(obsrv%indxbnds)
-        do j = 1,  nbndobs
+        do j = 1,  obsrv%indxbnds_count
           iexg = obsrv%indxbnds(j)
           v = DZERO
           select case (obsrv%ObsTypeId)

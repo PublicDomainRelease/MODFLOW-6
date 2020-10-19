@@ -1,1 +1,0 @@
-This is the Globally Coarse (GC) model described in Vilhelmsen et al. (2012).

@@ -1,149 +1,337 @@
-cd ex01-twri
+cd ex-gwf-advtidal
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex02-tidal
+cd ex-gwf-bcf2ss-p01a
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex03-bcf2ss
+cd ex-gwf-bcf2ss-p02a
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex04-fhb
+cd ex-gwf-bump-p01a
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex05-mfusg1disu
+cd ex-gwf-bump-p01b
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex06-mfusg1disv
+cd ex-gwf-bump-p01c
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex07-mfusg1lgr
+cd ex-gwf-csub-p01
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex08-mfusg1xt3d
+cd ex-gwf-csub-p02a
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex09-bump
+cd ex-gwf-csub-p02b
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex10-bumpnr
+cd ex-gwf-csub-p03a
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex11-disvmesh
+cd ex-gwf-csub-p03b
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex12-hanicol
+cd ex-gwf-csub-p04
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex13-hanirow
+cd ex-gwf-disvmesh
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex14-hanixt3d
+cd ex-gwf-drn-p01a
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex15-whirlsxt3d
+cd ex-gwf-drn-p01b
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex16-mfnwt2
+cd ex-gwf-fhb
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex17-mfnwt3h
+cd ex-gwf-hanic
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex18-mfnwt3l
+cd ex-gwf-hanir
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex19-zaidel
+cd ex-gwf-hanix
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex20-keating
+cd ex-gwf-lak-p01
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex21-sfr1
+cd ex-gwf-lak-p02
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex22-lak2
+cd ex-gwf-lgr
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex23-lak4
+cd ex-gwf-lgrv-gc
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex24-neville
+cd ex-gwf-lgrv-gr
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex25-flowing-maw
+cd ex-gwf-lgrv-lgr
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex26-Reilly-maw
+cd ex-gwf-maw-p01a
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex27-advpakmvr
+cd ex-gwf-maw-p01b
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex28-mflgr3
+cd ex-gwf-maw-p02
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex29-vilhelmsen-gc
+cd ex-gwf-maw-p03a
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex30-vilhelmsen-gf
+cd ex-gwf-nwt-p02a
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex31-vilhelmsen-lgr
+cd ex-gwf-nwt-p02b
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex32-periodicbc
+cd ex-gwf-nwt-p03a
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex33-csub-jacob
+cd ex-gwf-nwt-p03b
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex34-csub-sub01
+cd ex-gwf-sagehen
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex35-csub-holly
+cd ex-gwf-sfr-p01
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex36-csub-subwt01
+cd ex-gwf-sfr-p01b
 ..\..\bin\mf6.exe
 cd ..
 
-cd ex37-draindepth
+cd ex-gwf-spbc
 ..\..\bin\mf6.exe
 cd ..
+
+cd ex-gwf-twri01
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwf-u1disv
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwf-u1disv-x
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwf-whirl
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwf-zaidel
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-henry-a
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-henry-b
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-keating\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-keating\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p01a\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p01a\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p01b\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p01b\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p01c\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p01c\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p01d\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p01d\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p02\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p02\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p02tg\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-moc3d-p02tg\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p01a
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p01b
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p01c
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p01d
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p03
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p04a
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p04b
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p04c
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p05
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p06
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p07
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p08
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p09
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dms-p10
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-mt3dsupp631\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dsupp631\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dsupp632a\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dsupp632a\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dsupp632b\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dsupp632b\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dsupp632c\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dsupp632c\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dsupp82\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dsupp82\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-prudic2004t2\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-prudic2004t2\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
 
 pause

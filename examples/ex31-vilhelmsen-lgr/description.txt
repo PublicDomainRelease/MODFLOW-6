@@ -1,1 +1,0 @@
-This is the Local Grid Refinement (LGR) model described in Vilhelmsen et al. (2012).

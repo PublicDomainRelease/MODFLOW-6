@@ -1,7 +1,0 @@
-begin options
-end options
-
-BEGIN GRIDDATA
-  strt
-  constant   0.000000    
-END GRIDDATA

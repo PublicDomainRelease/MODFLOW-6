@@ -9,7 +9,7 @@ module SfrModule
                              NAMEDBOUNDFLAG, LENBOUNDNAME, LENFTYPE,             &
                              LENPACKAGENAME, LENPAKLOC, MAXCHARLEN,              &
                              DHNOFLO, DHDRY, DNODATA,                            &
-                             TABLEFT, TABCENTER, TABRIGHT
+                             TABLEFT, TABCENTER, TABRIGHT                
   use SmoothingModule,  only: sQuadraticSaturation, sQSaturation,                &
                               sQuadraticSaturationDerivative,                    &
                               sQSaturationDerivative,                            &
@@ -25,7 +25,7 @@ module SfrModule
                        store_warning, ustop
   use SimVariablesModule, only: errmsg, warnmsg
   use GenericUtilitiesModule, only: sim_message
-  use ArrayHandlersModule, only: ExpandArray
+  !use ArrayHandlersModule, only: ExpandArray
   use BlockParserModule,   only: BlockParserType
   !
   implicit none
@@ -59,6 +59,7 @@ module SfrModule
     integer(I4B), pointer :: icheck => NULL()
     integer(I4B), pointer :: iconvchk => NULL()
     integer(I4B), pointer :: gwfiss => NULL()
+    integer(I4B), pointer :: ianynone => null()                                   !< number of reaches with 'none' connection
     ! -- double precision
     real(DP), pointer :: unitconv => NULL()
     real(DP), pointer :: dmaxchg => NULL()
@@ -197,6 +198,7 @@ contains
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
+    use MemoryHelperModule, only: create_mem_path
     ! -- dummy
     class(BndType), pointer :: packobj
     integer(I4B),intent(in) :: id
@@ -213,7 +215,7 @@ contains
     allocate(sfrobj)
     packobj => sfrobj
     !
-    ! -- create name and origin
+    ! -- create name and memory path
     call packobj%set_names(ibcnum, namemodel, pakname, ftype)
     packobj%text = text
     !
@@ -229,7 +231,7 @@ contains
     packobj%ibcnum = ibcnum
     packobj%ncolbnd = 4
     packobj%iscloc = 0  ! not supported
-    packobj%ictorigin = 'NPF'
+    packobj%ictMemPath = create_mem_path(namemodel,'NPF')
     !
     ! -- return
     return
@@ -243,6 +245,7 @@ contains
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     use MemoryManagerModule, only: mem_allocate, mem_setptr
+    use MemoryHelperModule, only: create_mem_path
     ! -- dummy
     class(SfrType),   intent(inout) :: this
 ! ------------------------------------------------------------------------------
@@ -251,25 +254,26 @@ contains
     call this%BndType%allocate_scalars()
     !
     ! -- allocate the object and assign values to object variables
-    call mem_allocate(this%iprhed, 'IPRHED', this%origin)
-    call mem_allocate(this%istageout, 'ISTAGEOUT', this%origin)
-    call mem_allocate(this%ibudgetout, 'IBUDGETOUT', this%origin)
-    call mem_allocate(this%ipakcsv, 'IPAKCSV', this%origin)
-    call mem_allocate(this%idiversions, 'IDIVERSIONS', this%origin)
-    call mem_allocate(this%maxsfrpicard, 'MAXSFRPICARD', this%origin)
-    call mem_allocate(this%maxsfrit, 'MAXSFRIT', this%origin)
-    call mem_allocate(this%bditems, 'BDITEMS', this%origin)
-    call mem_allocate(this%cbcauxitems, 'CBCAUXITEMS', this%origin)
-    call mem_allocate(this%unitconv, 'UNITCONV', this%origin)
-    call mem_allocate(this%dmaxchg, 'DMAXCHG', this%origin)
-    call mem_allocate(this%deps, 'DEPS', this%origin)
-    call mem_allocate(this%nconn, 'NCONN', this%origin)
-    call mem_allocate(this%icheck, 'ICHECK', this%origin)
-    call mem_allocate(this%iconvchk, 'ICONVCHK', this%origin)
-    call mem_allocate(this%idense, 'IDENSE', this%origin)
+    call mem_allocate(this%iprhed, 'IPRHED', this%memoryPath)
+    call mem_allocate(this%istageout, 'ISTAGEOUT', this%memoryPath)
+    call mem_allocate(this%ibudgetout, 'IBUDGETOUT', this%memoryPath)
+    call mem_allocate(this%ipakcsv, 'IPAKCSV', this%memoryPath)
+    call mem_allocate(this%idiversions, 'IDIVERSIONS', this%memoryPath)
+    call mem_allocate(this%maxsfrpicard, 'MAXSFRPICARD', this%memoryPath)
+    call mem_allocate(this%maxsfrit, 'MAXSFRIT', this%memoryPath)
+    call mem_allocate(this%bditems, 'BDITEMS', this%memoryPath)
+    call mem_allocate(this%cbcauxitems, 'CBCAUXITEMS', this%memoryPath)
+    call mem_allocate(this%unitconv, 'UNITCONV', this%memoryPath)
+    call mem_allocate(this%dmaxchg, 'DMAXCHG', this%memoryPath)
+    call mem_allocate(this%deps, 'DEPS', this%memoryPath)
+    call mem_allocate(this%nconn, 'NCONN', this%memoryPath)
+    call mem_allocate(this%icheck, 'ICHECK', this%memoryPath)
+    call mem_allocate(this%iconvchk, 'ICONVCHK', this%memoryPath)
+    call mem_allocate(this%idense, 'IDENSE', this%memoryPath)
+    call mem_allocate(this%ianynone, 'IANYNONE', this%memoryPath)
     !
     ! -- set pointer to gwf iss
-    call mem_setptr(this%gwfiss, 'ISS', trim(this%name_model))
+    call mem_setptr(this%gwfiss, 'ISS', create_mem_path(this%name_model))
     !
     ! -- Set values
     this%iprhed = 0
@@ -288,6 +292,7 @@ contains
     this%icheck = 1
     this%iconvchk = 1
     this%idense = 0
+    this%ianynone = 0
     !
     ! -- return
     return
@@ -315,56 +320,56 @@ contains
     ! -- allocate character array for budget text
     allocate(this%csfrbudget(this%bditems))
     call mem_allocate(this%sfrname, LENBOUNDNAME, this%maxbound,                 &
-                      'SFRNAME', this%origin)
+                      'SFRNAME', this%memoryPath)
     !
     ! -- variables originally in SfrDataType
-    call mem_allocate(this%iboundpak, this%maxbound, 'IBOUNDPAK', this%origin)
-    call mem_allocate(this%igwfnode, this%maxbound, 'IGWFNODE', this%origin)
-    call mem_allocate(this%igwftopnode, this%maxbound, 'IGWFTOPNODE', this%origin)
-    call mem_allocate(this%length, this%maxbound, 'LENGTH', this%origin)
-    call mem_allocate(this%width, this%maxbound, 'WIDTH', this%origin)
-    call mem_allocate(this%strtop, this%maxbound, 'STRTOP', this%origin)
-    call mem_allocate(this%bthick, this%maxbound, 'BTHICK', this%origin)
-    call mem_allocate(this%hk, this%maxbound, 'HK', this%origin)
-    call mem_allocate(this%slope, this%maxbound, 'SLOPE', this%origin)
-    call mem_allocate(this%nconnreach, this%maxbound, 'NCONNREACH', this%origin)
-    call mem_allocate(this%ustrf, this%maxbound, 'USTRF', this%origin)
-    call mem_allocate(this%ftotnd, this%maxbound, 'FTOTND', this%origin)
-    call mem_allocate(this%ndiv, this%maxbound, 'NDIV', this%origin)
-    call mem_allocate(this%usflow, this%maxbound, 'USFLOW', this%origin)
-    call mem_allocate(this%dsflow, this%maxbound, 'DSFLOW', this%origin)
-    call mem_allocate(this%depth, this%maxbound, 'DEPTH', this%origin)
-    call mem_allocate(this%stage, this%maxbound, 'STAGE', this%origin)
-    call mem_allocate(this%gwflow, this%maxbound, 'GWFLOW', this%origin)
-    call mem_allocate(this%simevap, this%maxbound, 'SIMEVAP', this%origin)
-    call mem_allocate(this%simrunoff, this%maxbound, 'SIMRUNOFF', this%origin)
-    call mem_allocate(this%stage0, this%maxbound, 'STAGE0', this%origin)
-    call mem_allocate(this%usflow0, this%maxbound, 'USFLOW0', this%origin)
+    call mem_allocate(this%iboundpak, this%maxbound, 'IBOUNDPAK', this%memoryPath)
+    call mem_allocate(this%igwfnode, this%maxbound, 'IGWFNODE', this%memoryPath)
+    call mem_allocate(this%igwftopnode, this%maxbound, 'IGWFTOPNODE', this%memoryPath)
+    call mem_allocate(this%length, this%maxbound, 'LENGTH', this%memoryPath)
+    call mem_allocate(this%width, this%maxbound, 'WIDTH', this%memoryPath)
+    call mem_allocate(this%strtop, this%maxbound, 'STRTOP', this%memoryPath)
+    call mem_allocate(this%bthick, this%maxbound, 'BTHICK', this%memoryPath)
+    call mem_allocate(this%hk, this%maxbound, 'HK', this%memoryPath)
+    call mem_allocate(this%slope, this%maxbound, 'SLOPE', this%memoryPath)
+    call mem_allocate(this%nconnreach, this%maxbound, 'NCONNREACH', this%memoryPath)
+    call mem_allocate(this%ustrf, this%maxbound, 'USTRF', this%memoryPath)
+    call mem_allocate(this%ftotnd, this%maxbound, 'FTOTND', this%memoryPath)
+    call mem_allocate(this%ndiv, this%maxbound, 'NDIV', this%memoryPath)
+    call mem_allocate(this%usflow, this%maxbound, 'USFLOW', this%memoryPath)
+    call mem_allocate(this%dsflow, this%maxbound, 'DSFLOW', this%memoryPath)
+    call mem_allocate(this%depth, this%maxbound, 'DEPTH', this%memoryPath)
+    call mem_allocate(this%stage, this%maxbound, 'STAGE', this%memoryPath)
+    call mem_allocate(this%gwflow, this%maxbound, 'GWFLOW', this%memoryPath)
+    call mem_allocate(this%simevap, this%maxbound, 'SIMEVAP', this%memoryPath)
+    call mem_allocate(this%simrunoff, this%maxbound, 'SIMRUNOFF', this%memoryPath)
+    call mem_allocate(this%stage0, this%maxbound, 'STAGE0', this%memoryPath)
+    call mem_allocate(this%usflow0, this%maxbound, 'USFLOW0', this%memoryPath)
     !
     ! -- connection data
-    call mem_allocate(this%ia, this%maxbound+1, 'IA', this%origin)
-    call mem_allocate(this%ja, 0, 'JA', this%origin)
-    call mem_allocate(this%idir, 0, 'IDIR', this%origin)
-    call mem_allocate(this%idiv, 0, 'IDIV', this%origin)
-    call mem_allocate(this%qconn, 0, 'QCONN', this%origin)
+    call mem_allocate(this%ia, this%maxbound+1, 'IA', this%memoryPath)
+    call mem_allocate(this%ja, 0, 'JA', this%memoryPath)
+    call mem_allocate(this%idir, 0, 'IDIR', this%memoryPath)
+    call mem_allocate(this%idiv, 0, 'IDIV', this%memoryPath)
+    call mem_allocate(this%qconn, 0, 'QCONN', this%memoryPath)
     !
     ! -- boundary data
-    call mem_allocate(this%rough, this%maxbound, 'ROUGH', this%origin)
-    call mem_allocate(this%rain, this%maxbound, 'RAIN', this%origin)
-    call mem_allocate(this%evap, this%maxbound, 'EVAP', this%origin)
-    call mem_allocate(this%inflow, this%maxbound, 'INFLOW', this%origin)
-    call mem_allocate(this%runoff, this%maxbound, 'RUNOFF', this%origin)
-    call mem_allocate(this%sstage, this%maxbound, 'SSTAGE', this%origin)
+    call mem_allocate(this%rough, this%maxbound, 'ROUGH', this%memoryPath)
+    call mem_allocate(this%rain, this%maxbound, 'RAIN', this%memoryPath)
+    call mem_allocate(this%evap, this%maxbound, 'EVAP', this%memoryPath)
+    call mem_allocate(this%inflow, this%maxbound, 'INFLOW', this%memoryPath)
+    call mem_allocate(this%runoff, this%maxbound, 'RUNOFF', this%memoryPath)
+    call mem_allocate(this%sstage, this%maxbound, 'SSTAGE', this%memoryPath)
     !
     ! -- aux variables
     call mem_allocate(this%rauxvar, this%naux, this%maxbound,                    &
-                      'RAUXVAR', this%origin)
+                      'RAUXVAR', this%memoryPath)
     !
     ! -- diversion variables
-    call mem_allocate(this%iadiv, this%maxbound+1, 'IADIV', this%origin)
-    call mem_allocate(this%divreach, 0, 'DIVREACH', this%origin)
-    call mem_allocate(this%divflow, 0, 'DIVFLOW', this%origin)
-    call mem_allocate(this%divq, 0, 'DIVQ', this%origin)
+    call mem_allocate(this%iadiv, this%maxbound+1, 'IADIV', this%memoryPath)
+    call mem_allocate(this%divreach, 0, 'DIVREACH', this%memoryPath)
+    call mem_allocate(this%divflow, 0, 'DIVFLOW', this%memoryPath)
+    call mem_allocate(this%divq, 0, 'DIVQ', this%memoryPath)
     !
     ! -- initialize variables
     do i = 1, this%maxbound
@@ -418,8 +423,8 @@ contains
     this%csfrbudget(8) = '          TO-MVR'
     !
     ! -- allocate and initialize budget output data
-    call mem_allocate(this%qoutflow, this%maxbound, 'QOUTFLOW', this%origin)
-    call mem_allocate(this%qextoutflow, this%maxbound, 'QEXTOUTFLOW', this%origin)
+    call mem_allocate(this%qoutflow, this%maxbound, 'QOUTFLOW', this%memoryPath)
+    call mem_allocate(this%qextoutflow, this%maxbound, 'QEXTOUTFLOW', this%memoryPath)
     do i = 1, this%maxbound
       this%qoutflow(i) = DZERO
       this%qextoutflow(i) = DZERO
@@ -427,19 +432,19 @@ contains
     !
     ! -- allocate and initialize dbuff
     if (this%istageout > 0) then
-      call mem_allocate(this%dbuff, this%maxbound, 'DBUFF', this%origin)
+      call mem_allocate(this%dbuff, this%maxbound, 'DBUFF', this%memoryPath)
       do i = 1, this%maxbound
         this%dbuff(i) = DZERO
       end do
     else
-      call mem_allocate(this%dbuff, 0, 'DBUFF', this%origin)
+      call mem_allocate(this%dbuff, 0, 'DBUFF', this%memoryPath)
     end if
     !
     ! -- allocate character array for budget text
     allocate(this%cauxcbc(this%cbcauxitems))
     !
     ! -- allocate and initialize qauxcbc
-    call mem_allocate(this%qauxcbc, this%cbcauxitems, 'QAUXCBC', this%origin)
+    call mem_allocate(this%qauxcbc, this%cbcauxitems, 'QAUXCBC', this%memoryPath)
     do i = 1, this%cbcauxitems
       this%qauxcbc(i) = DZERO
     end do
@@ -448,7 +453,7 @@ contains
     this%cauxcbc(1) = 'FLOW-AREA       '
     !
     ! -- allocate denseterms to size 0
-    call mem_allocate(this%denseterms, 3, 0, 'DENSETERMS', this%origin)
+    call mem_allocate(this%denseterms, 3, 0, 'DENSETERMS', this%memoryPath)
     !
     ! -- return
     return
@@ -731,7 +736,7 @@ contains
     ! -- setup pakmvrobj
     if (this%imover /= 0) then
       allocate(this%pakmvrobj)
-      call this%pakmvrobj%ar(this%maxbound, this%maxbound, this%origin)
+      call this%pakmvrobj%ar(this%maxbound, this%maxbound, this%memoryPath)
     endif
     !
     ! -- return
@@ -766,6 +771,7 @@ contains
     integer(I4B) :: ii
     integer(I4B) :: jj
     integer(I4B) :: iaux
+    integer(I4B) :: nconzero
     integer, allocatable, dimension(:) :: nboundchk
     real(DP), pointer :: bndElem => null()
     ! -- format
@@ -776,6 +782,7 @@ contains
     do i = 1, this%maxbound
       nboundchk(i) = 0
     enddo 
+    nconzero = 0
     !
     ! -- allocate local storage for aux variables
     if (this%naux > 0) then
@@ -816,6 +823,7 @@ contains
         ! -- read the cellid string and determine if 'none' is specified
         if (this%igwfnode(n) < 1) then
           call this%parser%GetStringCaps(keyword)
+          this%ianynone = this%ianynone + 1
           if (keyword /= 'NONE') then
             write(cnum, '(i0)') n
             errmsg = 'Cell ID (' // trim(cellid) //                              &
@@ -847,6 +855,8 @@ contains
             'NCON for reach', n,                                                 &
             'must be greater than or equal to 0 (', ival, ').'
           call store_error(errmsg)
+        else if (ival == 0) then
+          nconzero = nconzero + 1
         end if
         ! -- get upstream fraction for reach
         call this%parser%GetString(ustrfname)
@@ -872,7 +882,7 @@ contains
         if (this%inamedbound /= 0) then
           call this%parser%GetStringCaps(bndNameTemp)
           if (bndNameTemp /= '') then
-            bndName = bndNameTemp(1:16)
+            bndName = bndNameTemp
           endif
           !this%boundname(n) = bndName
         end if
@@ -882,7 +892,7 @@ contains
         text = manningname
         jj = 1 !for 'ROUGH'
         bndElem => this%rough(n)
-        call read_value_or_time_series_adv(text, n, jj, bndElem, this%name,      &
+        call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                             'BND', this%tsManager, this%iprpak,  &
                                             'MANNING')
         !
@@ -890,7 +900,7 @@ contains
         text = ustrfname
         jj = 1  ! For 'USTRF'
         bndElem => this%ustrf(n)
-        call read_value_or_time_series_adv(text, n, jj, bndElem, this%name,      &
+        call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                            'BND', this%tsManager, this%iprpak,   &
                                            'USTRF')
         !
@@ -899,7 +909,7 @@ contains
           text = caux(jj)
           ii = n
           bndElem => this%rauxvar(jj, ii)
-          call read_value_or_time_series_adv(text, ii, jj, bndElem, this%name,   &
+          call read_value_or_time_series_adv(text, ii, jj, bndElem, this%packName,   &
                                              'AUX', this%tsManager, this%iprpak, &
                                              this%auxname(jj))
         end do
@@ -931,6 +941,14 @@ contains
       endif
     end do
     deallocate(nboundchk)
+    !
+    ! -- Submit warning message if any reach has zero connections
+    if (nconzero > 0) then
+      write(warnmsg, '(a,1x,a,1x,a,1x,i0,1x, a)')                              &
+        'SFR Package', trim(this%packName),                                    &
+        'has', nconzero, 'reach(es) with zero connections.'
+      call store_warning(warnmsg)
+    endif
     !
     ! -- terminate if errors encountered in reach block
     if (count_errors() > 0) then
@@ -1003,10 +1021,10 @@ contains
     end do 
     !
     ! -- reallocate connection data for package
-    call mem_reallocate(this%ja, nja, 'JA', this%origin)
-    call mem_reallocate(this%idir, nja, 'IDIR', this%origin)
-    call mem_reallocate(this%idiv, nja, 'IDIV', this%origin)
-    call mem_reallocate(this%qconn, nja, 'QCONN', this%origin)
+    call mem_reallocate(this%ja, nja, 'JA', this%memoryPath)
+    call mem_reallocate(this%idir, nja, 'IDIR', this%memoryPath)
+    call mem_reallocate(this%idiv, nja, 'IDIV', this%memoryPath)
+    call mem_reallocate(this%qconn, nja, 'QCONN', this%memoryPath)
     !
     ! -- initialize connection data
     do n = 1, nja
@@ -1056,9 +1074,7 @@ contains
         endif
         !
         ! -- increment nboundchk
-        if (this%nconnreach(n) > 0) then
-          nboundchk(n) = nboundchk(n) + 1
-        end if
+        nboundchk(n) = nboundchk(n) + 1
         !
         ! -- add diagonal connection for reach
         call sparse%addconnection(n, n, 1)
@@ -1096,22 +1112,19 @@ contains
         'END OF ' // trim(adjustl(this%text)) // ' CONNECTIONDATA'
       
       do n = 1, this%maxbound
-        if (this%nconnreach(n) > 0) then
-          !
-          ! -- check for missing or duplicate sfr connections
-          if (nboundchk(n) == 0) then
-            write(errmsg,'(a,1x,i0)')                                            &
-              'No connection data specified for reach', n
-            call store_error(errmsg)
-          else if (nboundchk(n) > 1) then
-            write(errmsg,'(a,1x,i0,1x,a,1x,i0,1x,a)')                            &
-              'Connection data for reach', n,                                    &
-              'specified', nboundchk(n), 'times.'
-            call store_error(errmsg)
-          end if
+        !
+        ! -- check for missing or duplicate sfr connections
+        if (nboundchk(n) == 0) then
+          write(errmsg,'(a,1x,i0)')                                              &
+            'No connection data specified for reach', n
+          call store_error(errmsg)
+        else if (nboundchk(n) > 1) then
+          write(errmsg,'(a,1x,i0,1x,a,1x,i0,1x,a)')                              &
+            'Connection data for reach', n,                                      &
+            'specified', nboundchk(n), 'times.'
+          call store_error(errmsg)
         end if
       end do
-      
     else
       call store_error('Required connectiondata block not found.')
     end if
@@ -1128,8 +1141,10 @@ contains
     ! -- test for error condition
     if (ierr /= 0) then
       write(errmsg, '(a,3(1x,a))')                                               &
-        'Could not fill', trim(this%name), 'package IA and JA connection data.', &
-        'Check connectivity data in connectiondata block'
+        'Could not fill', trim(this%packName),                                   &
+        'package IA and JA connection data.',                                    &
+        'Check connectivity data in connectiondata block.'
+      call store_error(errmsg)
     end if
     !
     ! -- fill flat connection storage
@@ -1208,10 +1223,10 @@ contains
     !
     ! -- reallocate memory for diversions
     if (ndiversions > 0) then
-      call mem_reallocate(this%divreach, ndiversions, 'DIVREACH', this%origin)
+      call mem_reallocate(this%divreach, ndiversions, 'DIVREACH', this%memoryPath)
       allocate(this%divcprior(ndiversions))
-      call mem_reallocate(this%divflow, ndiversions, 'DIVFLOW', this%origin)
-      call mem_reallocate(this%divq, ndiversions, 'DIVQ', this%origin)
+      call mem_reallocate(this%divflow, ndiversions, 'DIVFLOW', this%memoryPath)
+      call mem_reallocate(this%divq, ndiversions, 'DIVQ', this%memoryPath)
     end if
     !
     ! -- inititialize diversion flow
@@ -1448,9 +1463,9 @@ contains
         !
         ! -- reset the input table object
         title = trim(adjustl(this%text)) // ' PACKAGE (' //                        &
-                trim(adjustl(this%name)) //') DATA FOR PERIOD'
+                trim(adjustl(this%packName)) //') DATA FOR PERIOD'
         write(title, '(a,1x,i6)') trim(adjustl(title)), kper
-        call table_cr(this%inputtab, this%name, title)
+        call table_cr(this%inputtab, this%packName, title)
         call this%inputtab%table_df(1, 4, this%iout, finalize=.FALSE.)
         text = 'NUMBER'
         call this%inputtab%initialize_column(text, 10, alignment=TABCENTER)
@@ -1528,7 +1543,7 @@ contains
     !
     ! -- check upstream fractions if time series are being used to
     !    define this variable
-    if (var_timeseries(this%tsManager, this%name, 'USTRF')) then
+    if (var_timeseries(this%tsManager, this%packName, 'USTRF')) then
       call this%sfr_check_ustrf()
     end if
     !
@@ -1822,7 +1837,7 @@ contains
         ntabcols = 9
         !
         ! -- setup table
-        call table_cr(this%pakcsvtab, this%name, '')
+        call table_cr(this%pakcsvtab, this%packName, '')
         call this%pakcsvtab%table_df(ntabrows, ntabcols, this%ipakcsv,           &
                                      lineseparator=.FALSE., separator=',',       &
                                      finalize=.FALSE.)
@@ -1881,13 +1896,13 @@ contains
       if (ABS(dhmax) > abs(dpak)) then
         ipak = locdhmax
         dpak = dhmax
-        write(cloc, "(a,'-',a)") trim(this%name), 'stage'
+        write(cloc, "(a,'-',a)") trim(this%packName), 'stage'
         cpak = trim(cloc)
       end if
       if (ABS(rmax) > abs(dpak)) then
         ipak = locrmax
         dpak = rmax
-        write(cloc, "(a,'-',a)") trim(this%name), 'inflow'
+        write(cloc, "(a,'-',a)") trim(this%packName), 'inflow'
         cpak = trim(cloc)
       end if
       !
@@ -2064,12 +2079,12 @@ contains
   end subroutine sfr_bd
 
   subroutine sfr_ot(this, kstp, kper, iout, ihedfl, ibudfl)
-    ! **************************************************************************
-    ! pak1t -- Output package budget
-    ! **************************************************************************
-    !
-    !    SPECIFICATIONS:
-    ! --------------------------------------------------------------------------
+! ******************************************************************************
+! sfr_ot -- Output package budget
+! ******************************************************************************
+!
+!    SPECIFICATIONS:
+! ------------------------------------------------------------------------------
     ! -- dummy
     class(SfrType) :: this
     integer(I4B),intent(in) :: kstp
@@ -2079,14 +2094,15 @@ contains
     integer(I4B),intent(in) :: ibudfl
     ! -- locals
     character (len=20) :: cellid
+    character (len=20), dimension(:), allocatable :: cellidstr
     integer(I4B) :: n
     integer(I4B) :: node
     real(DP) :: hgwf
     real(DP) :: sbot
     real(DP) :: depth, stage
     real(DP) :: w, cond, grad
-    ! format
-     ! --------------------------------------------------------------------------
+    ! -- format
+! ------------------------------------------------------------------------------
      !
      ! -- write sfr stage and depth table
      if (ihedfl /= 0 .and. this%iprhed /= 0) then
@@ -2101,7 +2117,7 @@ contains
           call this%dis%noder_to_string(node, cellid)
           hgwf = this%xnew(node)
         else
-          cellid = 'none'
+          cellid = 'NONE'
         end if
         if(this%inamedbound==1) then
           call this%stagetab%add_term(this%boundname(n))
@@ -2136,7 +2152,26 @@ contains
     !
     ! -- Output sfr flow table
     if (ibudfl /= 0 .and. this%iprflow /= 0) then
-      call this%budobj%write_flowtable(this%dis, kstp, kper)
+      !
+      ! -- If there are any 'none' gwf connections then need to calculate
+      !    a vector of cellids and pass that in to the budget flow table because
+      !    the table assumes that there are maxbound gwf entries, which is not
+      !    the case if any 'none's are specified.
+      if (this%ianynone > 0) then
+        allocate(cellidstr(this%maxbound))
+        do n = 1, this%maxbound
+          node = this%igwfnode(n)
+          if (node > 0) then
+            call this%dis%noder_to_string(node, cellidstr(n))
+          else
+            cellidstr(n) = 'NONE'
+          end if
+        end do
+        call this%budobj%write_flowtable(this%dis, kstp, kper, cellidstr)
+        deallocate(cellidstr)
+      else
+        call this%budobj%write_flowtable(this%dis, kstp, kper)
+      end if
     end if
     !
     ! -- Output sfr budget
@@ -2164,7 +2199,7 @@ contains
     call mem_deallocate(this%qoutflow)
     call mem_deallocate(this%qextoutflow)
     deallocate(this%csfrbudget)
-    call mem_deallocate(this%sfrname, 'SFRNAME', this%origin)
+    call mem_deallocate(this%sfrname, 'SFRNAME', this%memoryPath)
     call mem_deallocate(this%dbuff)
     deallocate(this%cauxcbc)
     call mem_deallocate(this%qauxcbc)
@@ -2255,6 +2290,7 @@ contains
     call mem_deallocate(this%icheck)
     call mem_deallocate(this%iconvchk)
     call mem_deallocate(this%idense)
+    call mem_deallocate(this%ianynone)
     nullify(this%gwfiss)
     !
     ! -- call BndType deallocate
@@ -2433,19 +2469,20 @@ contains
     ! -- dummy
     class(SfrType), intent(inout) :: this
     ! -- local
-    integer(I4B) :: i, j, n, nn
+    integer(I4B) :: i
+    integer(I4B) :: j
+    integer(I4B) :: n
     real(DP) :: v
     character(len=100) :: msg
     type(ObserveType), pointer :: obsrv => null()
     !---------------------------------------------------------------------------
     !
     ! Write simulated values for all sfr observations
-    if (this%obs%npakobs>0) then
+    if (this%obs%npakobs > 0) then
       call this%obs%obs_bd_clear()
       do i=1 ,this%obs%npakobs
         obsrv => this%obs%pakobs(i)%obsrv
-        nn = size(obsrv%indxbnds)
-        do j = 1,nn
+        do j = 1, obsrv%indxbnds_count
           n = obsrv%indxbnds(j)
           v = DZERO
           select case (obsrv%ObsTypeId)
@@ -2497,12 +2534,12 @@ contains
           call this%obs%SaveOneSimval(obsrv, v)
         end do
       end do
-    end if
-    !
-    ! -- write summary of package block error messages
-    if (count_errors() > 0) then
-      call this%parser%StoreErrorUnit()
-      call ustop()
+      !
+      ! -- write summary of package error messages
+      if (count_errors() > 0) then
+        call this%parser%StoreErrorUnit()
+        call ustop()
+      end if
     end if
     !
     return
@@ -2510,10 +2547,13 @@ contains
 
 
   subroutine sfr_rp_obs(this)
+    use TdisModule, only: kper
     ! -- dummy
     class(SfrType), intent(inout) :: this
     ! -- local
-    integer(I4B) :: i, j, n, nn1
+    integer(I4B) :: i
+    integer(I4B) :: j
+    integer(I4B) :: nn1
     character(len=LENBOUNDNAME) :: bname
     logical :: jfound
     class(ObserveType),   pointer :: obsrv => null()
@@ -2523,91 +2563,86 @@ contains
            '" is invalid in package "',a,'"')
 30  format('Boundary name not provided for observation "',a,                     &
            '" in package "',a,'"')
-    do i = 1, this%obs%npakobs
-      obsrv => this%obs%pakobs(i)%obsrv
-      !
-      ! -- indxbnds needs to be deallocated and reallocated (using
-      !    ExpandArray) each stress period because list of boundaries
-      !    can change each stress period.
-      if (allocated(obsrv%indxbnds)) then
-        deallocate(obsrv%indxbnds)
-      end if
-      !
-      ! -- get node number 1
-      nn1 = obsrv%NodeNumber
-      if (nn1 == NAMEDBOUNDFLAG) then
-        bname = obsrv%FeatureName
-        if (bname /= '') then
-          ! -- Observation location(s) is(are) based on a boundary name.
-          !    Iterate through all boundaries to identify and store
-          !    corresponding index(indices) in bound array.
-          jfound = .false.
-          do j = 1, this%maxbound
-            if (this%boundname(j) == bname) then
-              jfound = .true.
-              call ExpandArray(obsrv%indxbnds)
-              n = size(obsrv%indxbnds)
-              obsrv%indxbnds(n) = j
-            endif
-          enddo
-          if (.not. jfound) then
-            write(errmsg,10) trim(bname), trim(obsrv%name), trim(this%name)
-            call store_error(errmsg)
-          endif
-        else
-          write(errmsg,30) trim(obsrv%name), trim(this%name)
-          call store_error(errmsg)
-        endif
-      elseif (nn1 < 1 .or. nn1 > this%maxbound) then
-        write(errmsg, '(a,1x,a,1x,i0,1x,a,1x,i0,a)')                             &
-          trim(adjustl(obsrv%ObsTypeId)),                                        &
-          'reach must be greater than 0 and less than or equal to',              &
-          this%maxbound, '(specified value is ', nn1, ')'
-        call store_error(errmsg)
-      else
-        call ExpandArray(obsrv%indxbnds)
-        n = size(obsrv%indxbnds)
-        if (n == 1) then
-          obsrv%indxbnds(1) = nn1
-        else
-          errmsg = 'Programming error in sfr_rp_obs'
-          call store_error(errmsg)
-        endif
-      end if
-      !
-      ! -- catch non-cumulative observation assigned to observation defined
-      !    by a boundname that is assigned to more than one element
-      if (obsrv%ObsTypeId == 'STAGE') then
+    !
+    ! -- process each package observation
+    !    only done the first stress period since boundaries are fixed
+    !    for the simulation
+    if (kper == 1) then
+      do i = 1, this%obs%npakobs
+        obsrv => this%obs%pakobs(i)%obsrv
+        !
+        ! -- get node number 1
         nn1 = obsrv%NodeNumber
         if (nn1 == NAMEDBOUNDFLAG) then
-          n = size(obsrv%indxbnds)
-          if (n > 1) then
-            write(errmsg, '(a,3(1x,a))')                                         &
-              trim(adjustl(obsrv%ObsTypeId)),                                    &
-              'for observation', trim(adjustl(obsrv%Name)),                      &
-              ' must be assigned to a reach with a unique boundname.'
+          bname = obsrv%FeatureName
+          if (bname /= '') then
+            ! -- Observation location(s) is(are) based on a boundary name.
+            !    Iterate through all boundaries to identify and store
+            !    corresponding index(indices) in bound array.
+            jfound = .false.
+            do j = 1, this%maxbound
+              if (this%boundname(j) == bname) then
+                jfound = .true.
+                call obsrv%AddObsIndex(j)
+              endif
+            enddo
+            if (.not. jfound) then
+              write(errmsg,10) trim(bname), trim(obsrv%name), trim(this%packName)
+              call store_error(errmsg)
+            endif
+          else
+            write(errmsg,30) trim(obsrv%name), trim(this%packName)
+            call store_error(errmsg)
+          endif
+        else if (nn1 < 1 .or. nn1 > this%maxbound) then
+          write(errmsg, '(a,1x,a,1x,i0,1x,a,1x,i0,a)')                             &
+            trim(adjustl(obsrv%ObsTypeId)),                                        &
+            'reach must be greater than 0 and less than or equal to',              &
+            this%maxbound, '(specified value is ', nn1, ')'
+          call store_error(errmsg)
+        else
+          if (obsrv%indxbnds_count == 0) then
+            call obsrv%AddObsIndex(nn1)
+          else
+            errmsg = 'Programming error in sfr_rp_obs'
             call store_error(errmsg)
           end if
         end if
-      end if
-      !
-      ! -- check that node number 1 is valid; call store_error if not
-      n = size(obsrv%indxbnds)
-      do j = 1, n
-        nn1 = obsrv%indxbnds(j)
-        if (nn1 < 1 .or. nn1 > this%maxbound) then
-          write(errmsg, '(a,1x,a,1x,i0,1x,a,1x,i0,a)')                           &
-            trim(adjustl(obsrv%ObsTypeId)),                                      &
-            'reach must be greater than 0 and less than or equal to',            &
-            this%maxbound, '(specified value is ', nn1, ')'
-          call store_error(errmsg)
+        !
+        ! -- catch non-cumulative observation assigned to observation defined
+        !    by a boundname that is assigned to more than one element
+        if (obsrv%ObsTypeId == 'STAGE') then
+          nn1 = obsrv%NodeNumber
+          if (nn1 == NAMEDBOUNDFLAG) then
+            if (obsrv%indxbnds_count > 1) then
+              write(errmsg, '(a,3(1x,a))')                                         &
+                trim(adjustl(obsrv%ObsTypeId)),                                    &
+                'for observation', trim(adjustl(obsrv%Name)),                      &
+                ' must be assigned to a reach with a unique boundname.'
+              call store_error(errmsg)
+            end if
+          end if
         end if
+        !
+        ! -- check that node number 1 is valid; call store_error if not
+        do j = 1, obsrv%indxbnds_count
+          nn1 = obsrv%indxbnds(j)
+          if (nn1 < 1 .or. nn1 > this%maxbound) then
+            write(errmsg, '(a,1x,a,1x,i0,1x,a,1x,i0,a)')                           &
+              trim(adjustl(obsrv%ObsTypeId)),                                      &
+              'reach must be greater than 0 and less than or equal to',            &
+              this%maxbound, '(specified value is ', nn1, ')'
+            call store_error(errmsg)
+          end if
+        end do
       end do
-    end do
-    if (count_errors() > 0) then
-      call this%parser%StoreErrorUnit()
-      call ustop()
-    endif
+      !
+      ! -- evaluate if there are any observation errors
+      if (count_errors() > 0) then
+        call this%parser%StoreErrorUnit()
+        call ustop()
+      end if
+    end if
     !
     return
   end subroutine sfr_rp_obs
@@ -2702,42 +2737,42 @@ contains
         call this%parser%GetString(text)
         jj = 1  ! For 'MANNING'
         bndElem => this%rough(n)
-        call read_value_or_time_series_adv(text, n, jj, bndElem, this%name,      &
+        call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                            'BND', this%tsManager, this%iprpak,   &
                                            'MANNING')
       case ('STAGE')
         call this%parser%GetString(text)
         jj = 1  ! For 'STAGE'
         bndElem => this%sstage(n)
-        call read_value_or_time_series_adv(text, n, jj, bndElem, this%name,      &
+        call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                            'BND', this%tsManager, this%iprpak,   &
                                            'STAGE')
       case ('RAINFALL')
         call this%parser%GetString(text)
         jj = 1  ! For 'RAIN'
         bndElem => this%rain(n)
-        call read_value_or_time_series_adv(text, n, jj, bndElem, this%name,      &
+        call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                            'BND', this%tsManager, this%iprpak,   &
                                            'RAIN')
       case ('EVAPORATION')
         call this%parser%GetString(text)
         jj = 1  ! For 'EVAP'
         bndElem => this%evap(n)
-        call read_value_or_time_series_adv(text, n, jj, bndElem, this%name,      &
+        call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                            'BND', this%tsManager, this%iprpak,   &
                                            'MANNING')
       case ('RUNOFF')
         call this%parser%GetString(text)
         jj = 1  ! For 'RUNOFF'
         bndElem => this%runoff(n)
-        call read_value_or_time_series_adv(text, n, jj, bndElem, this%name,      &
+        call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                            'BND', this%tsManager, this%iprpak,   &
                                            'RUNOFF')
      case ('INFLOW')
         call this%parser%GetString(text)
         jj = 1  ! For 'INFLOW'
         bndElem => this%inflow(n)
-        call read_value_or_time_series_adv(text, n, jj, bndElem, this%name,      &
+        call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                            'BND', this%tsManager, this%iprpak,   &
                                            'INFLOW')
       case ('DIVERSION')
@@ -2766,7 +2801,7 @@ contains
         ii = this%iadiv(n) + idiv - 1
         jj = 1  ! For 'DIVERSION'
         bndElem => this%divflow(ii)
-        call read_value_or_time_series_adv(text, ii, jj, bndElem, this%name,     &
+        call read_value_or_time_series_adv(text, ii, jj, bndElem, this%packName,     &
                                            'BND', this%tsManager, this%iprpak,   &
                                            'DIVFLOW')
       case ('UPSTREAM_FRACTION')
@@ -2774,7 +2809,7 @@ contains
         call this%parser%GetString(text)
         jj = 1  ! For 'USTRF'
         bndElem => this%ustrf(n)
-        call read_value_or_time_series_adv(text, n, jj, bndElem, this%name,      &
+        call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                            'BND', this%tsManager, this%iprpak,   &
                                            'USTRF')
       case ('AUXILIARY')
@@ -2784,7 +2819,7 @@ contains
           call this%parser%GetString(text)
           ii = n
           bndElem => this%rauxvar(jj, ii)
-          call read_value_or_time_series_adv(text, ii, jj, bndElem, this%name,   &
+          call read_value_or_time_series_adv(text, ii, jj, bndElem, this%packName,   &
                                              'AUX', this%tsManager, this%iprpak, &
                                              this%auxname(jj))
           exit
@@ -3489,7 +3524,7 @@ contains
     !
     ! Add density contributions, if active
     if (this%idense /= 0) then
-      call this%sfr_calculate_density_exchange(n, hsfr, hgwf, cond, bt,        &
+      call this%sfr_calculate_density_exchange(n, hsfr, hgwf, cond, tp,        &
                                                qgwf, gwfhcof0, gwfrhs0)
     end if
     !
@@ -3629,8 +3664,8 @@ contains
     ! -- setup inputtab tableobj
     if (this%iprpak /= 0) then
       title = trim(adjustl(this%text)) // ' PACKAGE (' //                        &
-              trim(adjustl(this%name)) //') STATIC REACH DATA'
-      call table_cr(this%inputtab, this%name, title)
+              trim(adjustl(this%packName)) //') STATIC REACH DATA'
+      call table_cr(this%inputtab, this%packName, title)
       call this%inputtab%table_df(this%maxbound, 10, this%iout)
       text = 'NUMBER'
       call this%inputtab%initialize_column(text, 10, alignment=TABCENTER)
@@ -3755,8 +3790,8 @@ contains
       !
       ! -- reset the input table object
       title = trim(adjustl(this%text)) // ' PACKAGE (' //                        &
-              trim(adjustl(this%name)) //') STATIC REACH CONNECTION DATA'
-      call table_cr(this%inputtab, this%name, title)
+              trim(adjustl(this%packName)) //') STATIC REACH CONNECTION DATA'
+      call table_cr(this%inputtab, this%packName, title)
       call this%inputtab%table_df(this%maxbound, ntabcol, this%iout)
       text = 'REACH'
       call this%inputtab%initialize_column(text, 10, alignment=TABCENTER)
@@ -3884,9 +3919,9 @@ contains
       !
       ! -- reset the input table object
       title = trim(adjustl(this%text)) // ' PACKAGE (' //                        &
-              trim(adjustl(this%name)) //') STATIC UPSTREAM REACH ' //           &
+              trim(adjustl(this%packName)) //') STATIC UPSTREAM REACH ' //           &
               'CONNECTION DATA'
-      call table_cr(this%inputtab, this%name, title)
+      call table_cr(this%inputtab, this%packName, title)
       call this%inputtab%table_df(this%maxbound, ntabcol, this%iout)
       text = 'REACH'
       call this%inputtab%initialize_column(text, 10, alignment=TABCENTER)
@@ -3926,9 +3961,9 @@ contains
       !
       ! -- reset the input table object
       title = trim(adjustl(this%text)) // ' PACKAGE (' //                        &
-              trim(adjustl(this%name)) //') STATIC DOWNSTREAM ' //               &
+              trim(adjustl(this%packName)) //') STATIC DOWNSTREAM ' //               &
               'REACH CONNECTION DATA'
-      call table_cr(this%inputtab, this%name, title)
+      call table_cr(this%inputtab, this%packName, title)
       call this%inputtab%table_df(this%maxbound, ntabcol, this%iout)
       text = 'REACH'
       call this%inputtab%initialize_column(text, 10, alignment=TABCENTER)
@@ -3992,8 +4027,8 @@ contains
       !
       ! -- reset the input table object
       title = trim(adjustl(this%text)) // ' PACKAGE (' //                        &
-              trim(adjustl(this%name)) //') REACH DIVERSION DATA'
-      call table_cr(this%inputtab, this%name, title)
+              trim(adjustl(this%packName)) //') REACH DIVERSION DATA'
+      call table_cr(this%inputtab, this%packName, title)
       call this%inputtab%table_df(maxdiv, 4, this%iout)
       text = 'REACH'
       call this%inputtab%initialize_column(text, 10, alignment=TABCENTER)
@@ -4112,9 +4147,9 @@ contains
       !
       ! -- reset the input table object
       title = trim(adjustl(this%text)) // ' PACKAGE (' //                        &
-              trim(adjustl(this%name)) //') CONNECTED REACH UPSTREAM '        // &
+              trim(adjustl(this%packName)) //') CONNECTED REACH UPSTREAM '        // &
               'FRACTION DATA'
-      call table_cr(this%inputtab, this%name, title)
+      call table_cr(this%inputtab, this%packName, title)
       call this%inputtab%table_df(this%maxbound, maxcols, this%iout)
       text = 'REACH'
       call this%inputtab%initialize_column(text, 10, alignment=TABCENTER)
@@ -4165,7 +4200,7 @@ contains
           write(errmsg, '(a,2(1x,i0,1x,a),1x,a,g0,a,2(1x,a))')                   &
             'Reach', n, 'is connected to reach', n2, 'by a diversion',           &
             'but the upstream fraction is not equal to zero (', f, '). Check',   &
-            trim(this%name), 'package diversion and package data.'
+            trim(this%packName), 'package diversion and package data.'
           if (ids > 1) then
             call store_error(errmsg)
           else
@@ -4250,7 +4285,7 @@ contains
         if (abs(f-DONE) > DEM6) then
           write(errmsg, '(a,1x,i0,1x,a,g0,a,3(1x,a))')                           &
             'Upstream fractions for reach ', n, 'is not equal to one (', f,      &
-            '). Check', trim(this%name), 'package reach connectivity and',       &
+            '). Check', trim(this%packName), 'package reach connectivity and',       &
             'package data.'
           call store_error(errmsg)
         end if
@@ -4293,7 +4328,7 @@ contains
     if (this%naux > 0) nbudterm = nbudterm + 1
     !
     ! -- set up budobj
-    call budgetobject_cr(this%budobj, this%name)
+    call budgetobject_cr(this%budobj, this%packName)
     call this%budobj%budgetobject_df(this%maxbound, nbudterm, 0, 0)
     idx = 0
     !
@@ -4305,9 +4340,9 @@ contains
     auxtxt(1) = '       FLOW-AREA'
     call this%budobj%budterm(idx)%initialize(text, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              maxlist, .false., .false., &
                                              naux, auxtxt)
     !
@@ -4325,12 +4360,12 @@ contains
     ! -- 
     text = '             GWF'
     idx = idx + 1
-    maxlist = this%maxbound 
+    maxlist = this%maxbound - this%ianynone
     naux = 1
     auxtxt(1) = '       FLOW-AREA'
     call this%budobj%budterm(idx)%initialize(text, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              this%name_model, &
                                              this%name_model, &
                                              maxlist, .false., .true., &
@@ -4339,7 +4374,9 @@ contains
     q = DZERO
     do n = 1, this%maxbound
       n2 = this%igwfnode(n)
-      call this%budobj%budterm(idx)%update_term(n, n2, q)
+      if (n2 > 0) then
+        call this%budobj%budterm(idx)%update_term(n, n2, q)
+      end if
     end do
     !
     ! -- 
@@ -4349,9 +4386,9 @@ contains
     naux = 0
     call this%budobj%budterm(idx)%initialize(text, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              maxlist, .false., .false., &
                                              naux)
     !
@@ -4362,9 +4399,9 @@ contains
     naux = 0
     call this%budobj%budterm(idx)%initialize(text, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              maxlist, .false., .false., &
                                              naux)
     !
@@ -4375,9 +4412,9 @@ contains
     naux = 0
     call this%budobj%budterm(idx)%initialize(text, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              maxlist, .false., .false., &
                                              naux)
     !
@@ -4388,9 +4425,9 @@ contains
     naux = 0
     call this%budobj%budterm(idx)%initialize(text, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              maxlist, .false., .false., &
                                              naux)
     !
@@ -4401,9 +4438,9 @@ contains
     naux = 0
     call this%budobj%budterm(idx)%initialize(text, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              maxlist, .false., .false., &
                                              naux)
     !
@@ -4415,9 +4452,9 @@ contains
     auxtxt(1) = '          VOLUME'
     call this%budobj%budterm(idx)%initialize(text, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              this%name_model, &
-                                             this%name, &
+                                             this%packName, &
                                              maxlist, .false., .false., &
                                              naux, auxtxt)
     !
@@ -4431,9 +4468,9 @@ contains
       naux = 0
       call this%budobj%budterm(idx)%initialize(text, &
                                                this%name_model, &
-                                               this%name, &
+                                               this%packName, &
                                                this%name_model, &
-                                               this%name, &
+                                               this%packName, &
                                                maxlist, .false., .false., &
                                                naux)
       !
@@ -4444,9 +4481,9 @@ contains
       naux = 0
       call this%budobj%budterm(idx)%initialize(text, &
                                                this%name_model, &
-                                               this%name, &
+                                               this%packName, &
                                                this%name_model, &
-                                               this%name, &
+                                               this%packName, &
                                                maxlist, .false., .false., &
                                                naux)
     end if
@@ -4461,9 +4498,9 @@ contains
       maxlist = this%maxbound
       call this%budobj%budterm(idx)%initialize(text, &
                                                this%name_model, &
-                                               this%name, &
+                                               this%packName, &
                                                this%name_model, &
-                                               this%name, &
+                                               this%packName, &
                                                maxlist, .false., .false., &
                                                naux, this%auxname)
     end if
@@ -4534,12 +4571,14 @@ contains
     !
     ! -- GWF (LEAKAGE)
     idx = idx + 1
-    call this%budobj%budterm(idx)%reset(this%maxbound)
+    call this%budobj%budterm(idx)%reset(this%maxbound - this%ianynone)
     do n = 1, this%maxbound
-      this%qauxcbc(1) = this%width(n) * this%length(n)
       n2 = this%igwfnode(n)
-      q = -this%gwflow(n)
-      call this%budobj%budterm(idx)%update_term(n, n2, q, this%qauxcbc)
+      if (n2 > 0) then
+        this%qauxcbc(1) = this%width(n) * this%length(n)
+        q = -this%gwflow(n)
+        call this%budobj%budterm(idx)%update_term(n, n2, q, this%qauxcbc)
+      end if
     end do
     !
     ! -- RAIN
@@ -4683,10 +4722,10 @@ contains
       !
       ! -- set up table title
       title = trim(adjustl(this%text)) // ' PACKAGE (' //                        &
-              trim(adjustl(this%name)) //') STAGES FOR EACH CONTROL VOLUME'
+              trim(adjustl(this%packName)) //') STAGES FOR EACH CONTROL VOLUME'
       !
       ! -- set up stage tableobj
-      call table_cr(this%stagetab, this%name, title)
+      call table_cr(this%stagetab, this%packName, title)
       call this%stagetab%table_df(this%maxbound, nterms, this%iout,              &
                                   transient=.TRUE.)
       !
@@ -4876,14 +4915,14 @@ contains
     ! -- Set idense and reallocate denseterms to be of size MAXBOUND
     this%idense = 1
     call mem_reallocate(this%denseterms, 3, this%MAXBOUND, 'DENSETERMS', &
-                        this%origin)
+                        this%memoryPath)
     do i = 1, this%maxbound
       do j = 1, 3
         this%denseterms(j, i) = DZERO
       end do
     end do
     write(this%iout,'(/1x,a)') 'DENSITY TERMS HAVE BEEN ACTIVATED FOR SFR &
-      &PACKAGE: ' // trim(adjustl(this%name))
+      &PACKAGE: ' // trim(adjustl(this%packName))
     !
     ! -- return
     return

@@ -8,7 +8,10 @@ module NumericalSolutionModule
                                      DEM4, DEM3, DEM2, DEM1, DHALF,            &
                                      DONE, DTHREE, DEP6, DEP20, DNODATA,       &
                                      TABLEFT, TABRIGHT,                        &
-                                     MNORMAL, MVALIDATE
+                                     MNORMAL, MVALIDATE,                       &
+                                     MEMREADONLY, MEMREADWRITE,                &
+                                     LENMEMPATH
+  use MemoryHelperModule,      only: create_mem_path                                     
   use TableModule,             only: TableType, table_cr
   use GenericUtilitiesModule,  only: IS_SAME, sim_message, stop_with_error
   use VersionModule,           only: IDEVELOPMODE
@@ -35,6 +38,7 @@ module NumericalSolutionModule
   public :: GetNumericalSolutionFromList
   
   type, extends(BaseSolutionType) :: NumericalSolutionType
+    character(len=LENMEMPATH)                            :: memoryPath !< the path for storing solution variables in the memory manager
     character(len=LINELENGTH)                            :: fname
     type(ListType)                                       :: modellist
     type(ListType)                                       :: exchangelist
@@ -71,8 +75,8 @@ module NumericalSolutionModule
     real(DP), pointer                                    :: res_in  => NULL()
     integer(I4B), pointer                                :: ibcount => NULL()
     integer(I4B), pointer                                :: icnvg => NULL()
-    integer(I4B), pointer                                :: itertot_timestep => NULL()   ! total nr. of linear solves per call to sln_ca
-    integer(I4B), pointer                                :: itertot_sim => NULL()        ! total nr. of inner iterations for simulation
+    integer(I4B), pointer                                :: itertot_timestep => NULL()   !< total nr. of linear solves per call to sln_ca
+    integer(I4B), pointer                                :: itertot_sim => NULL()        !< total nr. of inner iterations for simulation
     integer(I4B), pointer                                :: mxiter => NULL()
     integer(I4B), pointer                                :: linmeth => NULL()
     integer(I4B), pointer                                :: nonmeth => NULL()
@@ -158,7 +162,7 @@ module NumericalSolutionModule
     procedure, private :: writeCSVHeader
     procedure, private :: writePTCInfoToFile
     
-    ! Expose these for use through the BMI/AMI:
+    ! Expose these for use through the BMI/XMI:
     procedure, public :: prepareSolve
     procedure, public :: solve
     procedure, public :: finalizeSolve
@@ -195,7 +199,12 @@ contains
     allocate(solution)
     solbase => solution
     write(solutionname,'(a, i0)') 'SLN_', id
-    call solution%allocate_scalars(solutionname)
+    !
+    solution%name = solutionname
+    solution%memoryPath = create_mem_path(solutionname)
+    !
+    call solution%allocate_scalars()
+    !
     call AddBaseSolutionToList(basesolutionlist, solbase)
     !
     solution%id = id
@@ -217,7 +226,7 @@ contains
     return
   end subroutine solution_create
 
-  subroutine allocate_scalars(this, solutionname)
+  subroutine allocate_scalars(this)
 ! ******************************************************************************
 ! allocate_scalars -- Allocate scalars
 ! ******************************************************************************
@@ -228,59 +237,55 @@ contains
     use MemoryManagerModule, only: mem_allocate
     ! -- dummy
     class(NumericalSolutionType) :: this
-    character(len=*), intent(in) :: solutionname
     ! -- local
 ! ------------------------------------------------------------------------------
     !
-    ! -- set value for solution name, which is a member of the base solution
-    this%name = solutionname
-    !
     ! -- allocate scalars
-    call mem_allocate(this%id, 'ID', solutionname)
-    call mem_allocate(this%iu, 'IU', solutionname)
-    call mem_allocate(this%ttform, 'TTFORM', solutionname)
-    call mem_allocate(this%ttsoln, 'TTSOLN', solutionname)
-    call mem_allocate(this%neq, 'NEQ', solutionname)
-    call mem_allocate(this%nja, 'NJA', solutionname)
-    call mem_allocate(this%dvclose, 'DVCLOSE', solutionname)
-    call mem_allocate(this%hiclose, 'HICLOSE', solutionname)
-    call mem_allocate(this%bigchold, 'BIGCHOLD', solutionname)
-    call mem_allocate(this%bigch, 'BIGCH', solutionname)
-    call mem_allocate(this%relaxold, 'RELAXOLD', solutionname)
-    call mem_allocate(this%res_prev, 'RES_PREV', solutionname)
-    call mem_allocate(this%res_new, 'RES_NEW', solutionname)
-    call mem_allocate(this%res_in, 'RES_IN', solutionname)
-    call mem_allocate(this%ibcount, 'IBCOUNT', solutionname)
-    call mem_allocate(this%icnvg, 'ICNVG', solutionname)
-    call mem_allocate(this%itertot_timestep, 'ITERTOT_TIMESTEP', solutionname)
-    call mem_allocate(this%itertot_sim, 'INNERTOT_SIM', solutionname)
-    call mem_allocate(this%mxiter, 'MXITER', solutionname)
-    call mem_allocate(this%linmeth, 'LINMETH', solutionname)
-    call mem_allocate(this%nonmeth, 'NONMETH', solutionname)
-    call mem_allocate(this%iprims, 'IPRIMS', solutionname)
-    call mem_allocate(this%theta, 'THETA', solutionname)
-    call mem_allocate(this%akappa, 'AKAPPA', solutionname)
-    call mem_allocate(this%gamma, 'GAMMA', solutionname)
-    call mem_allocate(this%amomentum, 'AMOMENTUM', solutionname)
-    call mem_allocate(this%breduc, 'BREDUC', solutionname)
-    call mem_allocate(this%btol, 'BTOL', solutionname)
-    call mem_allocate(this%res_lim, 'RES_LIM', solutionname)
-    call mem_allocate(this%numtrack, 'NUMTRACK', solutionname)
-    call mem_allocate(this%ibflag, 'IBFLAG', solutionname)
-    call mem_allocate(this%icsvouterout, 'ICSVOUTEROUT', solutionname)
-    call mem_allocate(this%icsvinnerout, 'ICSVINNEROUT', solutionname)
-    call mem_allocate(this%nitermax, 'NITERMAX', solutionname)
-    call mem_allocate(this%convnmod, 'CONVNMOD', solutionname)
-    call mem_allocate(this%iallowptc, 'IALLOWPTC', solutionname)
-    call mem_allocate(this%iptcopt, 'IPTCOPT', solutionname)
-    call mem_allocate(this%iptcout, 'IPTCOUT', solutionname)
-    call mem_allocate(this%l2norm0, 'L2NORM0', solutionname)
-    call mem_allocate(this%ptcfact, 'PTCFACT', solutionname)
-    call mem_allocate(this%ptcdel, 'PTCDEL', solutionname)
-    call mem_allocate(this%ptcdel0, 'PTCDEL0', solutionname)
-    call mem_allocate(this%ptcexp, 'PTCEXP', solutionname)
-    call mem_allocate(this%ptcthresh, 'PTCTHRESH', solutionname)
-    call mem_allocate(this%ptcrat, 'PTCRAT', solutionname)
+    call mem_allocate(this%id, 'ID', this%memoryPath)
+    call mem_allocate(this%iu, 'IU', this%memoryPath)
+    call mem_allocate(this%ttform, 'TTFORM', this%memoryPath)
+    call mem_allocate(this%ttsoln, 'TTSOLN', this%memoryPath)
+    call mem_allocate(this%neq, 'NEQ', this%memoryPath)
+    call mem_allocate(this%nja, 'NJA', this%memoryPath)
+    call mem_allocate(this%dvclose, 'DVCLOSE', this%memoryPath)
+    call mem_allocate(this%hiclose, 'HICLOSE', this%memoryPath)
+    call mem_allocate(this%bigchold, 'BIGCHOLD', this%memoryPath)
+    call mem_allocate(this%bigch, 'BIGCH', this%memoryPath)
+    call mem_allocate(this%relaxold, 'RELAXOLD', this%memoryPath)
+    call mem_allocate(this%res_prev, 'RES_PREV', this%memoryPath)
+    call mem_allocate(this%res_new, 'RES_NEW', this%memoryPath)
+    call mem_allocate(this%res_in, 'RES_IN', this%memoryPath)
+    call mem_allocate(this%ibcount, 'IBCOUNT', this%memoryPath)
+    call mem_allocate(this%icnvg, 'ICNVG', this%memoryPath)
+    call mem_allocate(this%itertot_timestep, 'ITERTOT_TIMESTEP', this%memoryPath)
+    call mem_allocate(this%itertot_sim, 'INNERTOT_SIM', this%memoryPath)
+    call mem_allocate(this%mxiter, 'MXITER', this%memoryPath, MEMREADWRITE)
+    call mem_allocate(this%linmeth, 'LINMETH', this%memoryPath)
+    call mem_allocate(this%nonmeth, 'NONMETH', this%memoryPath)
+    call mem_allocate(this%iprims, 'IPRIMS', this%memoryPath)
+    call mem_allocate(this%theta, 'THETA', this%memoryPath)
+    call mem_allocate(this%akappa, 'AKAPPA', this%memoryPath)
+    call mem_allocate(this%gamma, 'GAMMA', this%memoryPath)
+    call mem_allocate(this%amomentum, 'AMOMENTUM', this%memoryPath)
+    call mem_allocate(this%breduc, 'BREDUC', this%memoryPath)
+    call mem_allocate(this%btol, 'BTOL', this%memoryPath)
+    call mem_allocate(this%res_lim, 'RES_LIM', this%memoryPath)
+    call mem_allocate(this%numtrack, 'NUMTRACK', this%memoryPath)
+    call mem_allocate(this%ibflag, 'IBFLAG', this%memoryPath)
+    call mem_allocate(this%icsvouterout, 'ICSVOUTEROUT', this%memoryPath)
+    call mem_allocate(this%icsvinnerout, 'ICSVINNEROUT', this%memoryPath)
+    call mem_allocate(this%nitermax, 'NITERMAX', this%memoryPath)
+    call mem_allocate(this%convnmod, 'CONVNMOD', this%memoryPath)
+    call mem_allocate(this%iallowptc, 'IALLOWPTC', this%memoryPath)
+    call mem_allocate(this%iptcopt, 'IPTCOPT', this%memoryPath)
+    call mem_allocate(this%iptcout, 'IPTCOUT', this%memoryPath)
+    call mem_allocate(this%l2norm0, 'L2NORM0', this%memoryPath)
+    call mem_allocate(this%ptcfact, 'PTCFACT', this%memoryPath)
+    call mem_allocate(this%ptcdel, 'PTCDEL', this%memoryPath)
+    call mem_allocate(this%ptcdel0, 'PTCDEL0', this%memoryPath)
+    call mem_allocate(this%ptcexp, 'PTCEXP', this%memoryPath)
+    call mem_allocate(this%ptcthresh, 'PTCTHRESH', this%memoryPath)
+    call mem_allocate(this%ptcrat, 'PTCRAT', this%memoryPath)
     !
     ! -- initialize
     this%id = 0
@@ -304,9 +309,9 @@ contains
     this%linmeth = 1
     this%nonmeth = 0
     this%iprims = 0
-    this%theta = DZERO
+    this%theta = DONE
     this%akappa = DZERO
-    this%gamma = DZERO
+    this%gamma = DONE
     this%amomentum = DZERO
     this%breduc = DZERO
     this%btol = 0
@@ -353,27 +358,27 @@ contains
     this%convnmod = this%modellist%Count()
     !
     ! -- allocate arrays
-    call mem_allocate(this%ia, this%neq + 1, 'IA', this%name)
-    call mem_allocate(this%x, this%neq, 'X', this%name)
-    call mem_allocate(this%rhs, this%neq, 'RHS', this%name)
-    call mem_allocate(this%active, this%neq, 'IACTIVE', this%name)
-    call mem_allocate(this%xtemp, this%neq, 'XTEMP', this%name)
-    call mem_allocate(this%dxold, this%neq, 'DXOLD', this%name)
-    call mem_allocate(this%hncg, 0, 'HNCG', this%name)
-    call mem_allocate(this%lrch, 3, 0, 'LRCH', this%name)
-    call mem_allocate(this%wsave, 0, 'WSAVE', this%name)
-    call mem_allocate(this%hchold, 0, 'HCHOLD', this%name)
-    call mem_allocate(this%deold, 0, 'DEOLD', this%name)
-    call mem_allocate(this%convmodstart, this%convnmod+1, 'CONVMODSTART', this%name)
-    call mem_allocate(this%locdv, this%convnmod, 'LOCDV', this%name)
-    call mem_allocate(this%locdr, this%convnmod, 'LOCDR', this%name)
-    call mem_allocate(this%itinner, 0, 'ITINNER', this%name)
-    call mem_allocate(this%convlocdv, this%convnmod, 0, 'CONVLOCDV', this%name)
-    call mem_allocate(this%convlocdr, this%convnmod, 0, 'CONVLOCDR', this%name)
-    call mem_allocate(this%dvmax, this%convnmod, 'DVMAX', this%name)
-    call mem_allocate(this%drmax, this%convnmod, 'DRMAX', this%name)
-    call mem_allocate(this%convdvmax, this%convnmod, 0, 'CONVDVMAX', this%name)
-    call mem_allocate(this%convdrmax, this%convnmod, 0, 'CONVDRMAX', this%name)
+    call mem_allocate(this%ia, this%neq + 1, 'IA', this%memoryPath, MEMREADONLY)
+    call mem_allocate(this%x, this%neq, 'X', this%memoryPath)
+    call mem_allocate(this%rhs, this%neq, 'RHS', this%memoryPath)
+    call mem_allocate(this%active, this%neq, 'IACTIVE', this%memoryPath)
+    call mem_allocate(this%xtemp, this%neq, 'XTEMP', this%memoryPath)
+    call mem_allocate(this%dxold, this%neq, 'DXOLD', this%memoryPath)
+    call mem_allocate(this%hncg, 0, 'HNCG', this%memoryPath)
+    call mem_allocate(this%lrch, 3, 0, 'LRCH', this%memoryPath)
+    call mem_allocate(this%wsave, 0, 'WSAVE', this%memoryPath)
+    call mem_allocate(this%hchold, 0, 'HCHOLD', this%memoryPath)
+    call mem_allocate(this%deold, 0, 'DEOLD', this%memoryPath)
+    call mem_allocate(this%convmodstart, this%convnmod+1, 'CONVMODSTART', this%memoryPath)
+    call mem_allocate(this%locdv, this%convnmod, 'LOCDV', this%memoryPath)
+    call mem_allocate(this%locdr, this%convnmod, 'LOCDR', this%memoryPath)
+    call mem_allocate(this%itinner, 0, 'ITINNER', this%memoryPath)
+    call mem_allocate(this%convlocdv, this%convnmod, 0, 'CONVLOCDV', this%memoryPath)
+    call mem_allocate(this%convlocdr, this%convnmod, 0, 'CONVLOCDR', this%memoryPath)
+    call mem_allocate(this%dvmax, this%convnmod, 'DVMAX', this%memoryPath)
+    call mem_allocate(this%drmax, this%convnmod, 'DRMAX', this%memoryPath)
+    call mem_allocate(this%convdvmax, this%convnmod, 0, 'CONVDVMAX', this%memoryPath)
+    call mem_allocate(this%convdrmax, this%convnmod, 0, 'CONVDRMAX', this%memoryPath)
     !
     ! -- initialize allocated arrays
     do i = 1, this%neq
@@ -433,9 +438,9 @@ contains
     ! -- Go through each model and point x, ibound, and rhs to solution
     do i = 1, this%modellist%Count()
       mp => GetNumericalModelFromList(this%modellist, i)
-      call mp%set_xptr(this%x)
-      call mp%set_rhsptr(this%rhs)
-      call mp%set_iboundptr(this%active)
+      call mp%set_xptr(this%x, 'X', this%name)
+      call mp%set_rhsptr(this%rhs, 'RHS', this%name)
+      call mp%set_iboundptr(this%active, 'IBOUND', this%name)
     enddo
     !
     ! -- Create the sparsematrix instance
@@ -823,10 +828,19 @@ contains
       WRITE(IOUT,*) '***UNDER-RELAXATION WILL NOT BE USED***'
       WRITE(IOUT,*)
     ELSE
-      WRITE(errmsg,'(a)')                                                        &
+      WRITE(errmsg,'(a)')                                                      &
         'INCORRECT VALUE FOR VARIABLE NONMETH WAS SPECIFIED.'
       call store_error(errmsg)
     END IF
+    !
+    ! -- ensure gamma is > 0 for simple
+    if (this%nonmeth == 1) then
+      if (this%gamma == 0) then
+        WRITE(errmsg, '(a)')                                                   &
+          'GAMMA must be greater than zero if SIMPLE under-relaxation is used.'
+        call store_error(errmsg)
+      end if
+    end if
     !
     ! -- call secondary subroutine to initialize and read linear 
     !    solver parameters IMSLINEAR solver
@@ -882,26 +896,34 @@ contains
     !
     ! -- standard outer iteration formats
 9002 FORMAT(1X,'OUTER ITERATION CONVERGENCE CRITERION    (DVCLOSE) = ', E15.6, &
-    &      /1X,'MAXIMUM NUMBER OF OUTER ITERATIONS        (MXITER) = ', I9,    &
-    &      /1X,'SOLVER PRINTOUT INDEX                     (IPRIMS) = ', I9,    &
-    &      /1X,'NONLINEAR ITERATION METHOD            (NONLINMETH) = ', I9,    &
-    &      /1X,'LINEAR SOLUTION METHOD                   (LINMETH) = ', I9)
+    &      /1X,'MAXIMUM NUMBER OF OUTER ITERATIONS        (MXITER) = ', I0,    &
+    &      /1X,'SOLVER PRINTOUT INDEX                     (IPRIMS) = ', I0,    &
+    &      /1X,'NONLINEAR ITERATION METHOD            (NONLINMETH) = ', I0,    &
+    &      /1X,'LINEAR SOLUTION METHOD                   (LINMETH) = ', I0)
     !
-    IF(this%nonmeth /= 0)THEN
-      WRITE(IOUT,9003) this%theta, this%akappa, this%gamma, this%amomentum,    &
-                       this%numtrack
-      IF(this%numtrack /= 0) WRITE(IOUT,9004) this%btol,this%breduc,this%res_lim
-    END IF
+    if (this%nonmeth == 1) then ! simple
+      write(iout, 9003) this%gamma
+    else if (this%nonmeth == 2) then ! cooley
+      write(iout, 9004) this%gamma
+    else if (this%nonmeth == 3) then ! delta bar delta
+      write(iout, 9005) this%theta, this%akappa, this%gamma, this%amomentum
+    end if
     !
-    ! -- under-relaxation formats
-9003 FORMAT(1X,'UNDER-RELAXATION WEIGHT REDUCTION FACTOR   (THETA) = ', E15.6, &
+    ! -- write backtracking information
+    if(this%numtrack /= 0) write(iout, 9006) this%numtrack, this%btol,       &
+                                             this%breduc,this%res_lim
+    !
+    ! -- under-relaxation formats (simple, cooley, dbd)
+9003 FORMAT(1X,'UNDER-RELAXATION FACTOR                    (GAMMA) = ', E15.6)
+9004 FORMAT(1X,'UNDER-RELAXATION PREVIOUS HISTORY FACTOR   (GAMMA) = ', E15.6)
+9005 FORMAT(1X,'UNDER-RELAXATION WEIGHT REDUCTION FACTOR   (THETA) = ', E15.6, &
     &      /1X,'UNDER-RELAXATION WEIGHT INCREASE INCREMENT (KAPPA) = ', E15.6, &
     &      /1X,'UNDER-RELAXATION PREVIOUS HISTORY FACTOR   (GAMMA) = ', E15.6, &
-    &      /1X,'UNDER-RELAXATIONMOMENTUM TERM          (AMOMENTUM) = ', E15.6, &
-    &      /1X,'   MAXIMUM NUMBER OF BACKTRACKS         (NUMTRACK) = ',I9)
+    &      /1X,'UNDER-RELAXATION MOMENTUM TERM         (AMOMENTUM) = ', E15.6)
     !
     ! -- backtracking formats
-9004 FORMAT(1X,'BACKTRACKING TOLERANCE FACTOR               (BTOL) = ', E15.6, &
+9006 FORMAT(1X,'MAXIMUM NUMBER OF BACKTRACKS            (NUMTRACK) = ', I0,    &
+    &      /1X,'BACKTRACKING TOLERANCE FACTOR               (BTOL) = ', E15.6, &
     &      /1X,'BACKTRACKING REDUCTION FACTOR             (BREDUC) = ', E15.6, &
     &      /1X,'BACKTRACKING RESIDUAL LIMIT              (RES_LIM) = ', E15.6)
     !
@@ -920,7 +942,7 @@ contains
     call mem_reallocate(this%lrch, 3, this%mxiter, 'LRCH', this%name)
 
     ! delta-bar-delta under-relaxation
-    if(this%nonmeth.eq.3)then
+    if(this%nonmeth == 3)then
       call mem_reallocate(this%wsave, this%neq, 'WSAVE', this%name)
       call mem_reallocate(this%hchold, this%neq, 'HCHOLD', this%name)
       call mem_reallocate(this%deold, this%neq, 'DEOLD', this%name)
@@ -1168,8 +1190,7 @@ contains
 
   subroutine sln_ca(this, isgcnvg, isuppress_output)
 ! ******************************************************************************
-! sln_ca -- Solve the models in this solution for kper and kstp.  If necessary
-!           use subtiming to get to the end of the time step
+! sln_ca -- Solve the models in this solution for kper and kstp.
 ! ******************************************************************************
 !
 !    SPECIFICATIONS:
@@ -1310,7 +1331,7 @@ contains
     
   end subroutine writePTCInfoToFile
   
-  ! prepare for outer iteration loop
+  ! prepare for the system solve by advancing the simulation
   subroutine prepareSolve(this)
     class(NumericalSolutionType) :: this
     ! local
@@ -1335,7 +1356,8 @@ contains
     
   end subroutine prepareSolve
   
-  ! this routine performs a single outer iteration, with the following steps:
+  ! This routine builds and solves the system for this numerical solution. 
+  ! It roughly consists of the following steps:
   !
   ! - backtracking
   ! - reset amat and rhs
@@ -2462,9 +2484,9 @@ contains
       this%dvclose = dem3
       this%mxiter = 25
       this%nonmeth = 0
-      this%theta = 1.0
+      this%theta = DONE
       this%akappa = DZERO
-      this%gamma = DZERO
+      this%gamma = DONE
       this%amomentum = DZERO
       this%numtrack = 0
       this%btol = DZERO
@@ -2840,6 +2862,7 @@ contains
     ! -- option for using simple dampening (as done by MODFLOW-2005 PCG)
     if (this%nonmeth == 1) then
       do n = 1, neq
+        !
         ! -- skip inactive nodes
         if (active(n) < 1) cycle
         !
@@ -2853,12 +2876,17 @@ contains
     !
     ! -- option for using cooley underrelaxation
     else if (this%nonmeth == 2) then
+      !
+      ! -- set bigch
+      this%bigch = bigch
+      !
+      ! -- initialize values for first iteration
       if (kiter == 1) then
-        relax = done
+        relax = DONE
         this%relaxold = DONE
-        this%bigch = bigch
         this%bigchold = bigch
       else
+        !
         ! -- compute relaxation factor
         es = this%bigch / (this%bigchold * this%relaxold)
         aes = abs(es)
@@ -2870,16 +2898,18 @@ contains
       end if
       this%relaxold = relax
       !
-      ! -- modify cooley to use exponential average of past changes
+      ! -- modify cooley to use weighted average of past changes
       this%bigchold = (DONE - this%gamma) * this%bigch  + this%gamma *         &
                       this%bigchold
-      ! -- this method does it right after newton - need to do it after
-      !    underrelaxation and backtracking.
       !
       ! -- compute new head after under-relaxation
       if (relax < DONE) then
         do n = 1, neq
+          !
+          ! -- skip inactive nodes
           if (active(n) < 1) cycle
+          !
+          ! -- update dependent variable
           delx = x(n) - xtemp(n)
           this%dxold(n) = delx
           x(n) = xtemp(n) + relax * delx
@@ -2889,12 +2919,14 @@ contains
     ! -- option for using delta-bar-delta scheme to under-relax for all equations
     else if (this%nonmeth == 3) then
       do n = 1, neq
+        !
         ! -- skip inactive nodes
         if (active(n) < 1) cycle
         !
         ! -- compute step-size (delta x) and initialize d-b-d parameters
         delx = x(n) - xtemp(n)
-
+        !
+        ! -- initialize values for first iteration
         if ( kiter == 1 ) then
           this%wsave(n) = DONE
           this%hchold(n) = DEM20
@@ -2903,7 +2935,7 @@ contains
         !
         ! -- compute new relaxation term as per delta-bar-delta
         ww = this%wsave(n)
-
+        !
         ! for flip-flop condition, decrease factor
         if ( this%deold(n)*delx < DZERO ) then
           ww = this%theta * this%wsave(n)
@@ -2913,11 +2945,9 @@ contains
         end if
         if ( ww > DONE ) ww = DONE
         this%wsave(n) = ww
-
-        ! -- compute exponential average of past changes in hchold
+        !
+        ! -- compute weighted average of past changes in hchold
         if (kiter == 1) then
-          ! -- this method does it right after newton
-          ! -- need to do it after underrelaxation and backtracking.
           this%hchold(n) = delx
         else
           this%hchold(n) = (DONE - this%gamma) * delx +                        &

@@ -3,12 +3,14 @@ module GwfModule
   use KindModule,                  only: DP, I4B
   use InputOutputModule,           only: ParseLine, upcase
   use ConstantsModule,             only: LENFTYPE, LENPAKLOC, DZERO, DEM1, DTEN, DEP20
+  use VersionModule,               only: write_listfile_header
   use NumericalModelModule,        only: NumericalModelType
   use BaseDisModule,               only: DisBaseType
   use BndModule,                   only: BndType, AddBndToList, GetBndFromList
   use GwfIcModule,                 only: GwfIcType
   use GwfNpfModule,                only: GwfNpfType
   use Xt3dModule,                  only: Xt3dType
+  use GwfBuyModule,                only: GwfBuyType
   use GwfHfbModule,                only: GwfHfbType
   use GwfStoModule,                only: GwfStoType
   use GwfCsubModule,               only: GwfCsubType
@@ -32,6 +34,7 @@ module GwfModule
     type(GwfIcType),                pointer :: ic      => null()                ! initial conditions package
     type(GwfNpfType),               pointer :: npf     => null()                ! node property flow package
     type(Xt3dType),                 pointer :: xt3d    => null()                ! xt3d option for npf
+    type(GwfBuyType),               pointer :: buy     => null()                ! buoyancy package
     type(GwfStoType),               pointer :: sto     => null()                ! storage package
     type(GwfCsubType),              pointer :: csub    => null()                ! subsidence package    
     type(GwfOcType),                pointer :: oc      => null()                ! output control package
@@ -43,6 +46,7 @@ module GwfModule
     integer(I4B),                   pointer :: inic    => null()                ! unit number IC
     integer(I4B),                   pointer :: inoc    => null()                ! unit number OC
     integer(I4B),                   pointer :: innpf   => null()                ! unit number NPF
+    integer(I4B),                   pointer :: inbuy   => null()                ! unit number BUY
     integer(I4B),                   pointer :: insto   => null()                ! unit number STO
     integer(I4B),                   pointer :: incsub  => null()                ! unit number CSUB
     integer(I4B),                   pointer :: inmvr   => null()                ! unit number MVR
@@ -88,7 +92,7 @@ module GwfModule
                 'GHB6 ', 'RCH6 ', 'EVT6 ', 'OBS6 ', 'GNC6 ', & ! 15
                 '     ', 'CHD6 ', '     ', '     ', '     ', & ! 20
                 '     ', 'MAW6 ', 'SFR6 ', 'LAK6 ', 'UZF6 ', & ! 25
-                'DISV6', 'MVR6 ', 'CSUB6', '     ', '     ', & ! 30
+                'DISV6', 'MVR6 ', 'CSUB6', 'BUY6 ', '     ', & ! 30
                 70 * '     '/
 
   contains
@@ -104,19 +108,18 @@ module GwfModule
 ! ------------------------------------------------------------------------------
     ! -- modules
     use ListsModule,                only: basemodellist
+    use MemoryHelperModule,         only: create_mem_path
     use BaseModelModule,            only: AddBaseModelToList
     use SimModule,                  only: ustop, store_error, count_errors
     use GenericUtilitiesModule,     only: write_centered
     use ConstantsModule,            only: LINELENGTH, LENPACKAGENAME
-    use VersionModule,              only: VERSION, MFVNAM, MFTITLE,             &
-                                          FMTDISCLAIMER, IDEVELOPMODE
-    use CompilerVersion
     use MemoryManagerModule,        only: mem_allocate
     use GwfDisModule,               only: dis_cr
     use GwfDisvModule,              only: disv_cr
     use GwfDisuModule,              only: disu_cr
     use GwfNpfModule,               only: npf_cr
     use Xt3dModule,                 only: xt3d_cr
+    use GwfBuyModule,               only: buy_cr
     use GwfStoModule,               only: sto_cr
     use GwfCsubModule,              only: csub_cr
     use GwfMvrModule,               only: mvr_cr
@@ -140,12 +143,15 @@ module GwfModule
     class(BaseModelType), pointer       :: model
     integer(I4B) :: nwords
     character(len=LINELENGTH), allocatable, dimension(:) :: words
-    character(len=80) :: compiler
     ! -- format
 ! ------------------------------------------------------------------------------
     !
     ! -- Allocate a new GWF Model (this) and add it to basemodellist
     allocate(this)
+    !
+    ! -- Set memory path before allocation in memory manager can be done
+    this%memoryPath = create_mem_path(modelname)
+    !
     call this%allocate_scalars(modelname)
     model => this
     call AddBaseModelToList(basemodellist, model)
@@ -162,29 +168,8 @@ module GwfModule
     call namefile_obj%add_cunit(niunit, cunit)
     call namefile_obj%openlistfile(this%iout)
     !
-    ! -- Write title to list file
-    call write_centered('MODFLOW'//MFVNAM, 80, iunit=this%iout)
-    call write_centered(MFTITLE, 80, iunit=this%iout)
-    call write_centered('GROUNDWATER FLOW MODEL (GWF)', 80, iunit=this%iout)
-    call write_centered('VERSION '//VERSION, 80, iunit=this%iout)
-    !
-    ! -- Write if develop mode
-    if (IDEVELOPMODE == 1) then
-      call write_centered('***DEVELOP MODE***', 80, iunit=this%iout)
-    end if
-    !
-    ! -- Write compiler version
-    call get_compiler(compiler)
-    call write_centered(' ', 80, iunit=this%iout)
-    call write_centered(trim(adjustl(compiler)), 80, iunit=this%iout)
-    !
-    ! -- Write disclaimer
-    write(this%iout, FMTDISCLAIMER)
-    !
-    ! -- Write precision of real variables
-    write(this%iout, '(/,a)') 'MODFLOW was compiled using uniform precision.'
-    write(this%iout, '(a,i0,/)') 'Precision of REAL variables: ',              &
-                                 precision(DZERO)
+    ! -- Write header to model list file
+    call write_listfile_header(this%iout, 'GROUNDWATER FLOW MODEL (GWF)')
     !
     ! -- Open files
     call namefile_obj%openfiles(this%iout)
@@ -250,6 +235,7 @@ module GwfModule
     call namefile_obj%get_unitnumber('IC6',  this%inic, 1)
     call namefile_obj%get_unitnumber('OC6',  this%inoc, 1)
     call namefile_obj%get_unitnumber('NPF6', this%innpf, 1)
+    call namefile_obj%get_unitnumber('BUY6', this%inbuy, 1)
     call namefile_obj%get_unitnumber('STO6', this%insto, 1)
     call namefile_obj%get_unitnumber('CSUB6', this%incsub, 1)
     call namefile_obj%get_unitnumber('MVR6', this%inmvr, 1)
@@ -275,10 +261,11 @@ module GwfModule
     ! -- Create packages that are tied directly to model
     call npf_cr(this%npf, this%name, this%innpf, this%iout)
     call xt3d_cr(this%xt3d, this%name, this%innpf, this%iout)
+    call buy_cr(this%buy, this%name, this%inbuy, this%iout)
     call gnc_cr(this%gnc, this%name, this%ingnc, this%iout)
     call hfb_cr(this%hfb, this%name, this%inhfb, this%iout)
     call sto_cr(this%sto, this%name, this%insto, this%iout)
-    call csub_cr(this%csub, this%name, this%insto, this%sto%name,               &
+    call csub_cr(this%csub, this%name, this%insto, this%sto%packName,               &
                  this%incsub, this%iout)
     call ic_cr(this%ic, this%name, this%inic, this%iout, this%dis)
     call mvr_cr(this%mvr, this%name, this%inmvr, this%iout, this%dis)
@@ -325,7 +312,8 @@ module GwfModule
     call this%npf%npf_df(this%dis, this%xt3d, this%ingnc)
     call this%oc%oc_df()
     call this%budget%budget_df(niunit, 'VOLUME', 'L**3')
-    if(this%ingnc > 0) call this%gnc%gnc_df(this)
+    if (this%inbuy > 0) call this%buy%buy_df(this%dis)
+    if (this%ingnc > 0) call this%gnc%gnc_df(this)
     !
     ! -- Assign or point model members to dis members
     !    this%neq will be incremented if packages add additional unknowns
@@ -443,6 +431,7 @@ module GwfModule
     ! -- Allocate and read modules attached to model
     if(this%inic  > 0) call this%ic%ic_ar(this%x)
     if(this%innpf > 0) call this%npf%npf_ar(this%ic, this%ibound, this%x)
+    if(this%inbuy > 0) call this%buy%buy_ar(this%npf, this%ibound)
     if(this%inhfb > 0) call this%hfb%hfb_ar(this%ibound, this%xt3d, this%dis)
     if(this%insto > 0) call this%sto%sto_ar(this%dis, this%ibound)
     if(this%incsub > 0) call this%csub%csub_ar(this%dis, this%ibound)
@@ -462,6 +451,7 @@ module GwfModule
                                 this%xold, this%flowja)
       ! -- Read and allocate package
       call packobj%bnd_ar()
+      if (this%inbuy > 0) call this%buy%buy_ar_bnd(packobj, this%x)
     enddo
     !
     ! -- return
@@ -489,6 +479,7 @@ module GwfModule
     if (.not. readnewdata) return
     !
     ! -- Read and prepare
+    if(this%inbuy > 0) call this%buy%buy_rp()
     if(this%inhfb > 0) call this%hfb%hfb_rp()
     if(this%inoc > 0)  call this%oc%oc_rp()
     if(this%insto > 0) call this%sto%sto_rp()
@@ -530,6 +521,7 @@ module GwfModule
     if(this%innpf > 0) call this%npf%npf_ad(this%dis%nodes, this%xold)
     if(this%insto > 0) call this%sto%sto_ad()
     if(this%incsub > 0)  call this%csub%csub_ad(this%dis%nodes, this%x)
+    if(this%inbuy > 0)  call this%buy%buy_ad()
     if(this%inmvr > 0) call this%mvr%mvr_ad()
     do ip=1,this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
@@ -563,9 +555,11 @@ module GwfModule
     !
     ! -- Call package cf routines
     if(this%innpf > 0) call this%npf%npf_cf(kiter, this%dis%nodes, this%x)
+    if(this%inbuy > 0) call this%buy%buy_cf(kiter)
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_cf()
+      if (this%inbuy > 0) call this%buy%buy_cf_bnd(packobj, this%x)
     enddo
     !
     ! -- return
@@ -605,6 +599,8 @@ module GwfModule
     !
     ! -- Fill standard conductance terms
     if(this%innpf > 0) call this%npf%npf_fc(kiter, njasln, amatsln,            &
+                                            this%idxglo, this%rhs, this%x)
+    if(this%inbuy > 0) call this%buy%buy_fc(kiter, njasln, amatsln,  &
                                             this%idxglo, this%rhs, this%x)
     if(this%inhfb > 0) call this%hfb%hfb_fc(kiter, njasln, amatsln,            &
                                             this%idxglo, this%rhs, this%x)
@@ -933,6 +929,7 @@ module GwfModule
       this%flowja(i) = DZERO
     enddo
     if(this%innpf > 0) call this%npf%npf_flowja(this%x, this%flowja)
+    if(this%inbuy > 0) call this%buy%buy_flowja(this%x, this%flowja)
     if(this%inhfb > 0) call this%hfb%hfb_flowja(this%x, this%flowja)
     if(this%ingnc > 0) call this%gnc%flowja(this%flowja)
     !
@@ -989,11 +986,17 @@ module GwfModule
                            isuppress_output, this%budget)
       call this%sto%bdsav(icbcfl, icbcun)
     endif
+    !
     ! -- Skeletal storage, compaction and subsidence
     if (this%incsub > 0) then
       call this%csub%bdcalc(this%dis%nodes, this%x, this%xold,                 &
                             isuppress_output, this%budget)
       call this%csub%bdsav(idvfl, icbcfl, icbcun)
+    end if
+    !
+    ! -- Buoyancy save density
+    if (this%inbuy > 0) then
+      call this%buy%buy_bdsav(idvfl, icbcfl, icbcun)
     end if
     !
     ! -- Node Property Flow
@@ -1012,6 +1015,7 @@ module GwfModule
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_cf(reset_mover=.false.)
+      if (this%inbuy > 0) call this%buy%buy_cf_bnd(packobj, this%x)
     enddo
     !
     ! -- Boundary packages calculate budget and total flows to model budget
@@ -1023,9 +1027,7 @@ module GwfModule
     !
     ! -- Calculate and write simulated values for observations
     if(iprobs /= 0) then
-      if (icnvg > 0) then
-        call this%obs%obs_bd()
-      endif
+      call this%obs%obs_bd()
     endif
     !
     ! -- Return
@@ -1054,17 +1056,9 @@ module GwfModule
       &I0,' OF STRESS PERIOD ',I0,'****')"
 ! ------------------------------------------------------------------------------
     !
-    ! -- Set ibudfl flag for printing budget information
-    ibudfl = 0
-    if(this%oc%oc_print('BUDGET')) ibudfl = 1
-    if(this%icnvg == 0) ibudfl = 1
-    if(endofperiod) ibudfl = 1
-    !
-    ! -- Set ibudfl flag for printing dependent variable information
-    ihedfl = 0
-    if(this%oc%oc_print('HEAD')) ihedfl = 1
-    if(this%icnvg == 0) ihedfl = 1
-    if(endofperiod) ihedfl = 1
+    ! -- Set ibudfl and ihedfl flags for printing budget and heads information
+    ibudfl = this%oc%set_print_flag('BUDGET', this%icnvg, endofperiod)
+    ihedfl = this%oc%set_print_flag('HEAD', this%icnvg, endofperiod)
     !
     ! -- Output individual flows if requested
     if(ibudfl /= 0) then
@@ -1162,6 +1156,7 @@ module GwfModule
     call this%ic%ic_da()
     call this%npf%npf_da()
     call this%xt3d%xt3d_da()
+    call this%buy%buy_da()
     call this%gnc%gnc_da()
     call this%sto%sto_da()
     call this%csub%csub_da()
@@ -1176,6 +1171,7 @@ module GwfModule
     deallocate(this%ic)
     deallocate(this%npf)
     deallocate(this%xt3d)
+    deallocate(this%buy)
     deallocate(this%gnc)
     deallocate(this%sto)
     deallocate(this%csub)
@@ -1197,6 +1193,7 @@ module GwfModule
     call mem_deallocate(this%inoc)
     call mem_deallocate(this%inobs)
     call mem_deallocate(this%innpf)
+    call mem_deallocate(this%inbuy)
     call mem_deallocate(this%insto)
     call mem_deallocate(this%incsub)
     call mem_deallocate(this%inmvr)
@@ -1296,21 +1293,23 @@ module GwfModule
     call this%NumericalModelType%allocate_scalars(modelname)
     !
     ! -- allocate members that are part of model class
-    call mem_allocate(this%inic,  'INIC',  modelname)
-    call mem_allocate(this%inoc,  'INOC',  modelname)
-    call mem_allocate(this%innpf, 'INNPF', modelname)
-    call mem_allocate(this%insto, 'INSTO', modelname)
-    call mem_allocate(this%incsub, 'INCSUB', modelname)
-    call mem_allocate(this%inmvr, 'INMVR', modelname)
-    call mem_allocate(this%inhfb, 'INHFB', modelname)
-    call mem_allocate(this%ingnc, 'INGNC', modelname)
-    call mem_allocate(this%inobs, 'INOBS', modelname)
-    call mem_allocate(this%iss,   'ISS',   modelname)
-    call mem_allocate(this%inewtonur, 'INEWTONUR', modelname)
+    call mem_allocate(this%inic,  'INIC',  this%memoryPath)
+    call mem_allocate(this%inoc,  'INOC',  this%memoryPath)
+    call mem_allocate(this%innpf, 'INNPF', this%memoryPath)
+    call mem_allocate(this%inbuy, 'INBUY', this%memoryPath)
+    call mem_allocate(this%insto, 'INSTO', this%memoryPath)
+    call mem_allocate(this%incsub, 'INCSUB', this%memoryPath)
+    call mem_allocate(this%inmvr, 'INMVR', this%memoryPath)
+    call mem_allocate(this%inhfb, 'INHFB', this%memoryPath)
+    call mem_allocate(this%ingnc, 'INGNC', this%memoryPath)
+    call mem_allocate(this%inobs, 'INOBS', this%memoryPath)
+    call mem_allocate(this%iss,   'ISS',   this%memoryPath)
+    call mem_allocate(this%inewtonur, 'INEWTONUR', this%memoryPath)
     !
     this%inic = 0
     this%inoc = 0
     this%innpf = 0
+    this%inbuy = 0
     this%insto = 0
     this%incsub = 0
     this%inmvr = 0
@@ -1397,7 +1396,7 @@ module GwfModule
     !    pointer to the package in the model bndlist
     do ip = 1, this%bndlist%Count()
       packobj2 => GetBndFromList(this%bndlist, ip)
-      if(packobj2%name == pakname) then
+      if(packobj2%packName == pakname) then
         write(errmsg, '(a,a)') 'Cannot create package.  Package name  ' //   &
           'already exists: ', trim(pakname)
         call store_error(errmsg)
