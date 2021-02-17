@@ -9,9 +9,7 @@ module mf6bmiUtil
   use KindModule, only: DP, I4B, LGP
   use GenericUtilitiesModule, only: sim_message
   use SimVariablesModule, only: istdout
-  use MemoryManagerModule, only: get_from_memorylist
   use MemoryHelperModule, only: split_mem_address, split_mem_path
-  use MemoryTypeModule, only: MemoryType
   implicit none
   
   ! the following exported parameters will trigger annoying warnings with
@@ -40,20 +38,40 @@ contains
   !! Splits the full address string into a memory path and variable name,
   !! following the rules used by the memory manager.
   !<
-  subroutine split_address(c_var_address, mem_path, var_name)
+  subroutine split_address(c_var_address, mem_path, var_name, found)
     use MemoryHelperModule, only: memPathSeparator
     character (kind=c_char), intent(in) :: c_var_address(*) !< full address of a variable
     character(len=LENMEMPATH), intent(out) :: mem_path      !< memory path used by the memory manager
     character(len=LENVARNAME), intent(out) :: var_name      !< name of the variable
+    logical(LGP), intent(out)              :: found         !< true when found
     ! local
-    character(len=LENMEMPATH) :: var_address   
+    character(len=LENMEMPATH) :: var_address 
 
     ! convert to fortran string
     var_address = char_array_to_string(c_var_address, strlen(c_var_address)) 
-
     call split_mem_address(var_address, mem_path, var_name)
+    call check_mem_address(mem_path, var_name, found)
 
   end subroutine split_address
+
+  !> @brief Check if the variable exists in the memory manager
+  !<
+  subroutine check_mem_address(mem_path, var_name, found)
+  use MemoryManagerModule, only: get_from_memorylist
+  use MemoryTypeModule, only: MemoryType
+    character(len=LENMEMPATH), intent(out) :: mem_path      !< memory path used by the memory manager
+    character(len=LENVARNAME), intent(out) :: var_name      !< name of the variable
+    logical(LGP), intent(out)              :: found         !< true when found
+    ! local
+    type(MemoryType), pointer :: mt
+
+    found = .false.
+    mt => null()
+
+    ! check = false: otherwise stop is called when the variable does not exist
+    call get_from_memorylist(var_name, mem_path, mt, found, check=.false.)
+
+  end subroutine check_mem_address
 
   !> @brief Returns the string length without the trailing null character
   !<
@@ -196,26 +214,5 @@ contains
     ! careful comparison:
     if (expected_type == grid_type) is_match = .true.    
   end function confirm_grid_type
-
-  !> @brief Check memory access type
-  !<
-  function get_memory_access_type(mem_path, var_name, found) result(mem_access_type)
-    character(len=*), intent(in) :: mem_path !< memory path used by the memory manager
-    character(len=*), intent(in) :: var_name !< name of the variable
-    logical(LGP), intent(out) :: found       !< false, if entry does not exist
-    integer(I4B) :: mem_access_type          !< access type of memory in manager
-    ! local    
-    type(MemoryType), pointer :: mt
-
-     ! check access
-    found = .false.
-    mem_access_type = -1
-    mt => null()
-    call get_from_memorylist(var_name, mem_path, mt, found, check=.false.)
-    if (found) then
-      mem_access_type = mt%memaccess
-      found = .true.
-    end if
-  end function get_memory_access_type
 
 end module mf6bmiUtil

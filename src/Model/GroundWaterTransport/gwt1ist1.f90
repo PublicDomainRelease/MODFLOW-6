@@ -29,7 +29,7 @@ module GwtIstModule
     
     integer(I4B), pointer                            :: icimout => null()       ! unit number for binary cim output
     integer(I4B), pointer                            :: idcy => null()          ! order of decay rate (0:none, 1:first, 2:zero)
-    integer(I4B), pointer                            :: isrb => null()          ! sorbtion active flag (0:off, 1:on)
+    integer(I4B), pointer                            :: isrb => null()          ! sorption active flag (0:off, 1:on)
     real(DP), dimension(:), pointer, contiguous      :: cim => null()           ! concentration for immobile domain
     real(DP), dimension(:), pointer, contiguous      :: zetaim => null()        ! mass transfer rate to immobile domain
     real(DP), dimension(:), pointer, contiguous      :: thetaim => null()       ! porosity of the immobile domain
@@ -154,15 +154,15 @@ module GwtIstModule
     call budget_cr(this%budget, this%memoryPath)
     call this%budget%budget_df(NBDITEMS, 'MASS', 'M', bdzone=this%packName)
     !
-    ! -- Perform a check to ensure that sorbtion and decay are set 
+    ! -- Perform a check to ensure that sorption and decay are set 
     !    consistently between the MST and IST packages.
     if (this%idcy /= this%mst%idcy) then
       call store_error('DECAY MUST BE ACTIVATED CONSISTENTLY BETWEEN THE &
         &MST AND IST PACKAGES.  TURN DECAY ON OR OFF FOR BOTH PACKAGES.')
     endif
     if (this%isrb /= this%mst%isrb) then
-      call store_error('SORBTION MUST BE ACTIVATED CONSISTENTLY BETWEEN THE &
-        &MST AND IST PACKAGES.  TURN SORBTION ON OR OFF FOR BOTH PACKAGES.')
+      call store_error('SORPTION MUST BE ACTIVATED CONSISTENTLY BETWEEN THE &
+        &MST AND IST PACKAGES.  TURN SORPTION ON OR OFF FOR BOTH PACKAGES.')
     endif
     if (count_errors() > 0) then
       call this%parser%StoreErrorUnit()
@@ -231,6 +231,7 @@ module GwtIstModule
     real(DP) :: thetamfrac
     real(DP) :: thetaimfrac
     real(DP) :: kd
+    real(DP) :: rhob
     real(DP) :: lambda1im
     real(DP) :: lambda2im
     real(DP) :: gamma1im
@@ -258,6 +259,7 @@ module GwtIstModule
       !
       ! -- Add dual domain mass transfer contributions to rhs and hcof
       kd = DZERO
+      rhob = DZERO
       lambda1im = DZERO
       lambda2im = DZERO
       gamma1im = DZERO
@@ -266,11 +268,12 @@ module GwtIstModule
       if (this%idcy == 2) gamma1im = this%decay(n)
       if (this%isrb > 0) then
         kd = this%distcoef(n)
+        rhob = this%bulk_density(n)
         if (this%idcy == 1) lambda2im = this%decay_sorbed(n)
         if (this%idcy == 2) gamma2im = this%decay_sorbed(n)
       end if
       call calcddhcofrhs(this%thetaim(n), vcell, delt, swtpdt, swt,          &
-                          thetamfrac, thetaimfrac, this%bulk_density(n), kd, &
+                          thetamfrac, thetaimfrac, rhob, kd,                 &
                           lambda1im, lambda2im, gamma1im, gamma2im,          &
                           this%zetaim(n), this%cim(n), hhcof, rrhs)
       amatsln(idxglo(idiag)) = amatsln(idxglo(idiag)) + hhcof
@@ -313,6 +316,8 @@ module GwtIstModule
     integer(I4B) :: ibinun, ipflg
     real(DP) :: ratin, ratout
     integer(I4B) :: n
+    integer(I4B) :: nbound
+    integer(I4B) :: naux
     real(DP) :: rate
     real(DP) :: swt, swtpdt
     real(DP) :: hhcof, rrhs
@@ -320,6 +325,7 @@ module GwtIstModule
     real(DP) :: thetamfrac
     real(DP) :: thetaimfrac
     real(DP) :: kd
+    real(DP) :: rhob
     real(DP) :: lambda1im
     real(DP) :: lambda2im
     real(DP) :: gamma1im
@@ -340,8 +346,21 @@ module GwtIstModule
     else
       ibinun = this%ipakcb
     end if
-    if (icbcfl == 0) ibinun = 0
-    if (isuppress_output /= 0) ibinun = 0
+    if (icbcfl == 0) then
+      ibinun = 0
+    end if
+    if (isuppress_output /= 0) then
+      ibinun = 0
+    end if
+    !
+    ! -- If cell-by-cell flows will be saved as a list, write header.
+    if(ibinun /= 0) then
+      nbound = this%dis%nodes
+      naux = 0
+      call this%dis%record_srcdst_list_header(this%text, this%name_model,      &
+                  this%name_model, this%name_model, this%packName, naux,       &
+                  this%auxname, ibinun, nbound, this%iout)
+    endif
     !
     ! -- Reset budget object for this immobile domain package
     call this%budget%reset()
@@ -350,43 +369,57 @@ module GwtIstModule
     do n = 1, this%dis%nodes
       !
       ! -- skip if transport inactive
-      if(this%ibound(n) <= 0) cycle
-      !
-      ! -- calculate new and old water volumes
-      vcell = this%dis%area(n) * (this%dis%top(n) - this%dis%bot(n))
-      swtpdt = this%fmi%gwfsat(n)
-      swt = this%fmi%gwfsatold(n, delt)
-      !
-      ! -- Set thetamfrac and thetaimfrac
-      thetamfrac = this%mst%get_thetamfrac(n)
-      thetaimfrac = this%mst%get_thetaimfrac(n, this%thetaim(n))
-      !
-      ! -- Calculate exchange with immobile domain
       rate = DZERO
-      hhcof = DZERO
-      rrhs = DZERO
-      kd = DZERO
-      lambda1im = DZERO
-      lambda2im = DZERO
-      gamma1im = DZERO
-      gamma2im = DZERO
-      if (this%idcy == 1) lambda1im = this%decay(n)
-      if (this%idcy == 2) gamma1im = this%decay(n)
-      if (this%isrb > 0) then
-        kd = this%distcoef(n)
-        if (this%idcy == 1) lambda2im = this%decay_sorbed(n)
-        if (this%idcy == 2) gamma2im = this%decay_sorbed(n)
+      if(this%ibound(n) > 0) then
+        !
+        ! -- calculate new and old water volumes
+        vcell = this%dis%area(n) * (this%dis%top(n) - this%dis%bot(n))
+        swtpdt = this%fmi%gwfsat(n)
+        swt = this%fmi%gwfsatold(n, delt)
+        !
+        ! -- Set thetamfrac and thetaimfrac
+        thetamfrac = this%mst%get_thetamfrac(n)
+        thetaimfrac = this%mst%get_thetaimfrac(n, this%thetaim(n))
+        !
+        ! -- Calculate exchange with immobile domain
+        rate = DZERO
+        hhcof = DZERO
+        rrhs = DZERO
+        kd = DZERO
+        rhob = DZERO
+        lambda1im = DZERO
+        lambda2im = DZERO
+        gamma1im = DZERO
+        gamma2im = DZERO
+        if (this%idcy == 1) lambda1im = this%decay(n)
+        if (this%idcy == 2) gamma1im = this%decay(n)
+        if (this%isrb > 0) then
+          kd = this%distcoef(n)
+          rhob = this%bulk_density(n)
+          if (this%idcy == 1) lambda2im = this%decay_sorbed(n)
+          if (this%idcy == 2) gamma2im = this%decay_sorbed(n)
+        end if
+        call calcddhcofrhs(this%thetaim(n), vcell, delt, swtpdt, swt,          &
+                            thetamfrac, thetaimfrac, rhob, kd,                 &
+                            lambda1im, lambda2im, gamma1im, gamma2im,          &
+                            this%zetaim(n), this%cim(n), hhcof, rrhs)
+        rate = hhcof * x(n) - rrhs
       end if
-      call calcddhcofrhs(this%thetaim(n), vcell, delt, swtpdt, swt,          &
-                          thetamfrac, thetaimfrac, this%bulk_density(n), kd, &
-                          lambda1im, lambda2im, gamma1im, gamma2im,          &
-                          this%zetaim(n), this%cim(n), hhcof, rrhs)
-      rate = hhcof * x(n) - rrhs
+      !
+      ! -- Accumulate rate
       if (rate < DZERO) then
         ratout = ratout - rate
       else
         ratin = ratin + rate
       endif
+      !
+      ! -- If saving cell-by-cell flows in list, write flow
+      if (ibinun /= 0) then
+        call this%dis%record_mf6_list_entry(ibinun, n, n, rate,                &
+                                            naux, this%auxvar(:,n),            &
+                                            olconv=.TRUE.,                     &
+                                            olconv2=.TRUE.)
+      end if
       !
     enddo
     !
@@ -624,7 +657,7 @@ module GwtIstModule
       "(4x,'CELL-BY-CELL FLOW INFORMATION WILL BE SAVED TO BINARY FILE " //    &
       "WHENEVER ICBCFL IS NOT ZERO.')"
     character(len=*), parameter :: fmtisrb =                                   &
-      "(4x,'LINEAR SORBTION IS SELECTED. ')"
+      "(4x,'LINEAR SORPTION IS SELECTED. ')"
     character(len=*), parameter :: fmtidcy1 =                               &
       "(4x,'FIRST-ORDER DECAY IS ACTIVE. ')"
     character(len=*), parameter :: fmtidcy2 =                               &
@@ -632,7 +665,8 @@ module GwtIstModule
 ! ------------------------------------------------------------------------------
     !
     ! -- get options block
-    call this%parser%GetBlock('OPTIONS', isfound, ierr, blockRequired=.false.)
+    call this%parser%GetBlock('OPTIONS', isfound, ierr, blockRequired=.false., &
+                              supportOpenClose=.true.)
     !
     ! -- parse options block if detected
     if (isfound) then
@@ -649,7 +683,7 @@ module GwtIstModule
           case('CIM')
             call this%parser%GetRemainingLine(keyword2)
             call this%ocd%set_option(keyword2, this%inunit, this%iout)
-          case ('SORBTION')
+          case ('SORBTION', 'SORPTION')
             this%isrb = 1
             write(this%iout, fmtisrb)
           case ('FIRST_ORDER_DECAY')
@@ -698,10 +732,10 @@ module GwtIstModule
     ! -- data
     data aname(1) /'            BULK DENSITY'/
     data aname(2) /'DISTRIBUTION COEFFICIENT'/
-    data aname(3) /'  FIRST RATE COEFFICIENT'/
-    data aname(4) /' SECOND RATE COEFFICIENT'/
+    data aname(3) /'              DECAY RATE'/
+    data aname(4) /'       DECAY SORBED RATE'/
     data aname(5) /'   INITIAL IMMOBILE CONC'/
-    data aname(6) /'  DUAL DOMAIN TRANS RATE'/
+    data aname(6) /'  FIRST ORDER TRANS RATE'/
     data aname(7) /'IMMOBILE DOMAIN POROSITY'/
 ! ------------------------------------------------------------------------------
     !
@@ -782,27 +816,27 @@ module GwtIstModule
       call ustop()
     end if
     !
-    ! -- Check for required sorbtion variables
+    ! -- Check for required sorption variables
     if (this%isrb > 0) then
       if (.not. lname(1)) then
-        write(errmsg, '(1x,a)') 'ERROR.  SORBTION IS ACTIVE BUT BULK_DENSITY &
+        write(errmsg, '(1x,a)') 'ERROR.  SORPTION IS ACTIVE BUT BULK_DENSITY &
           &NOT SPECIFIED.  BULK_DENSITY MUST BE SPECIFIED IN GRIDDATA BLOCK.'
         call store_error(errmsg)
       endif
       if (.not. lname(2)) then
-        write(errmsg, '(1x,a)') 'ERROR.  SORBTION IS ACTIVE BUT DISTRIBUTION &
+        write(errmsg, '(1x,a)') 'ERROR.  SORPTION IS ACTIVE BUT DISTRIBUTION &
           &COEFFICIENT NOT SPECIFIED.  DISTCOEF MUST BE SPECIFIED IN &
           &GRIDDATA BLOCK.'
         call store_error(errmsg)
       endif
     else
       if (lname(1)) then
-        write(this%iout, '(1x,a)') 'WARNING.  SORBTION IS NOT ACTIVE BUT &
+        write(this%iout, '(1x,a)') 'WARNING.  SORPTION IS NOT ACTIVE BUT &
           &BULK_DENSITY WAS SPECIFIED.  BULK_DENSITY WILL HAVE NO AFFECT ON &
           &SIMULATION RESULTS.'
       endif
       if (lname(2)) then
-        write(this%iout, '(1x,a)') 'WARNING.  SORBTION IS NOT ACTIVE BUT &
+        write(this%iout, '(1x,a)') 'WARNING.  SORPTION IS NOT ACTIVE BUT &
           &DISTRIBUTION COEFFICIENT WAS SPECIFIED.  DISTCOEF WILL HAVE &
           &NO AFFECT ON SIMULATION RESULTS.'
       endif
@@ -818,13 +852,13 @@ module GwtIstModule
       endif
       if (.not. lname(4)) then
         !
-        ! -- If DECAY_SORBED not specified and sorbtion is active, then set
+        ! -- If DECAY_SORBED not specified and sorption is active, then set
         !    decay_sorbed equal to decay
         if (this%isrb > 0) then
-          write(this%iout, '(1x, a)') 'DECAY_SORBED not provided in GRIDDATA &
-            &block. Assuming DECAY_SORBED=DECAY'
-          call mem_reassignptr(this%decay_sorbed, 'DECAY_SORBED',              &
-                               trim(this%memoryPath), 'DECAY', trim(this%memoryPath))
+          write(errmsg, '(a)') 'DECAY_SORBED not provided in GRIDDATA &
+            &block but decay and sorption are active.  Specify DECAY_SORBED &
+            &in GRIDDATA block.'
+          call store_error(errmsg)
         endif
       endif
     else
@@ -914,8 +948,8 @@ module GwtIstModule
     !
     ! -- calculate rhs, and switch the sign because this term needs to
     !    be moved to the left hand side
-    rhs = ddterm(9) * (ddterm(2) + ddterm(4)) / f * cimt - ddterm(9)           &
-          * ddterm(7) / f - ddterm(9) * ddterm(8) / f
+    rhs = (ddterm(2) + ddterm(4)) * cimt - ddterm(7) - ddterm(8)
+    rhs = rhs * ddterm(9) / f
     rhs = -rhs
     !
     ! -- Return
@@ -952,6 +986,7 @@ module GwtIstModule
     real(DP) :: cimt
     real(DP) :: cimtpdt
     real(DP) :: rate
+    real(DP) :: rhob
 ! ------------------------------------------------------------------------------
     !
     ! -- Calculate cim
@@ -963,6 +998,7 @@ module GwtIstModule
       thetamfrac = this%mst%get_thetamfrac(n)
       thetaimfrac = this%mst%get_thetaimfrac(n, this%thetaim(n))
       kd = DZERO
+      rhob = DZERO
       lambda1im = DZERO
       lambda2im = DZERO
       gamma1im = DZERO
@@ -971,6 +1007,7 @@ module GwtIstModule
       if (this%idcy == 2) gamma1im = this%decay(n)
       if (this%isrb > 0) then
         kd = this%distcoef(n)
+        rhob = this%bulk_density(n)
         if (this%idcy == 1) lambda2im = this%decay_sorbed(n)
         if (this%idcy == 2) gamma2im = this%decay_sorbed(n)
       end if
@@ -978,11 +1015,11 @@ module GwtIstModule
       ! -- calculate the ddterms
       cimt = this%cim(n)
       call calcddterms(this%thetaim(n), vcell, delt, swtpdt, swt, thetamfrac,  &
-                       thetaimfrac, this%bulk_density(n), kd, lambda1im,       &
+                       thetaimfrac, rhob, kd, lambda1im,                       &
                        lambda2im, gamma1im, gamma2im, this%zetaim(n), cimt,    &
                        ddterm, f)
       cimtpdt = calcddconc(this%thetaim(n), vcell, delt, swtpdt, swt,          &
-                           thetamfrac, thetaimfrac, this%bulk_density(n), kd,  &
+                           thetamfrac, thetaimfrac, rhob, kd,                  &
                            lambda1im, lambda2im, gamma1im, gamma2im,           &
                            this%zetaim(n), this%cim(n), cnew(n))
       !
@@ -1077,6 +1114,7 @@ module GwtIstModule
     real(DP) :: gamma1im
     real(DP) :: gamma2im
     real(DP) :: ctmp
+    real(DP) :: rhob
 ! ------------------------------------------------------------------------------
     !
     ! -- Calculate cim
@@ -1088,6 +1126,7 @@ module GwtIstModule
       thetamfrac = this%mst%get_thetamfrac(n)
       thetaimfrac = this%mst%get_thetaimfrac(n, this%thetaim(n))
       kd = DZERO
+      rhob = DZERO
       lambda1im = DZERO
       lambda2im = DZERO
       gamma1im = DZERO
@@ -1096,12 +1135,13 @@ module GwtIstModule
       if (this%idcy == 2) gamma1im = this%decay(n)
       if (this%isrb > 0) then
         kd = this%distcoef(n)
+        rhob = this%bulk_density(n)
         if (this%idcy == 1) lambda2im = this%decay_sorbed(n)
         if (this%idcy == 2) gamma2im = this%decay_sorbed(n)
       end if
       ctmp = this%cim(n)
       ctmp = calcddconc(this%thetaim(n), vcell, delt, swtpdt, swt,           &
-                        thetamfrac, thetaimfrac, this%bulk_density(n), kd,   &
+                        thetamfrac, thetaimfrac, rhob, kd,                   &
                         lambda1im, lambda2im, gamma1im, gamma2im,            &
                         this%zetaim(n), ctmp, cnew(n))
       cim(n) = ctmp
@@ -1198,13 +1238,13 @@ module GwtIstModule
     tled = DONE / delt
     !
     ! -- calculate terms
-    ddterm(1) = thetaim * vcell * tled * swtpdt
-    ddterm(2) = thetaim * vcell * tled * swt
-    ddterm(3) = thetaimfrac * rhob * vcell * kd * swtpdt * tled
-    ddterm(4) = thetaimfrac * rhob * vcell * kd * swt * tled
-    ddterm(5) = thetaim * lambda1im * vcell * swtpdt
+    ddterm(1) = thetaim * vcell * tled
+    ddterm(2) = thetaim * vcell * tled
+    ddterm(3) = thetaimfrac * rhob * vcell * kd * tled
+    ddterm(4) = thetaimfrac * rhob * vcell * kd * tled
+    ddterm(5) = thetaim * lambda1im * vcell
     ddterm(6) = thetaimfrac * lambda2im * rhob * kd * vcell
-    ddterm(7) = thetaim * gamma1im * vcell * swtpdt
+    ddterm(7) = thetaim * gamma1im * vcell
     ddterm(8) = thetaimfrac * gamma2im * rhob * vcell
     ddterm(9) = vcell * swtpdt * zetaim
     !

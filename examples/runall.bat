@@ -246,6 +246,54 @@ cd ex-gwt-mt3dms-p01d
 ..\..\bin\mf6.exe
 cd ..
 
+cd ex-gwt-mt3dms-p02a\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02a\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02b\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02b\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02c\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02c\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02d\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02d\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02e\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02e\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02f\mf6gwf
+..\..\..\bin\mf6.exe
+cd ..\..
+
+cd ex-gwt-mt3dms-p02f\mf6gwt
+..\..\..\bin\mf6.exe
+cd ..\..
+
 cd ex-gwt-mt3dms-p03
 ..\..\bin\mf6.exe
 cd ..
@@ -333,5 +381,21 @@ cd ..\..
 cd ex-gwt-prudic2004t2\mf6gwt
 ..\..\..\bin\mf6.exe
 cd ..\..
+
+cd ex-gwt-rotate
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-saltlake
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-uzt-2d-a
+..\..\bin\mf6.exe
+cd ..
+
+cd ex-gwt-uzt-2d-b
+..\..\bin\mf6.exe
+cd ..
 
 pause

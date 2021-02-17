@@ -8,8 +8,7 @@ module MawModule
                              DEP20, NAMEDBOUNDFLAG, LENPACKAGENAME, LENAUXNAME,  &
                              LENFTYPE, DHNOFLO, DHDRY, DNODATA, MAXCHARLEN,      &
                              TABLEFT, TABCENTER, TABRIGHT,                       &
-                             TABSTRING, TABUCSTRING, TABINTEGER, TABREAL,       &
-                             MEMREADWRITE
+                             TABSTRING, TABUCSTRING, TABINTEGER, TABREAL
   use SmoothingModule,  only: sQuadraticSaturation, sQSaturation,                &
                               sQuadraticSaturationDerivative,                    &
                               sQSaturationDerivative,                            &
@@ -280,7 +279,7 @@ contains
     call mem_allocate(this%imawiss, 'IMAWISS', this%memoryPath)
     call mem_allocate(this%imawissopt, 'IMAWISSOPT', this%memoryPath)
     call mem_allocate(this%nmawwells, 'NMAWWELLS', this%memoryPath)
-    call mem_allocate(this%check_attr, 'check_attr', this%memoryPath)
+    call mem_allocate(this%check_attr, 'CHECK_ATTR', this%memoryPath)
     call mem_allocate(this%ishutoffcnt, 'ISHUTOFFCNT', this%memoryPath)
     call mem_allocate(this%ieffradopt, 'IEFFRADOPT', this%memoryPath)
     call mem_allocate(this%satomega, 'SATOMEGA', this%memoryPath)
@@ -3111,8 +3110,7 @@ contains
     iend = istart + this%nmawwells - 1
     this%iboundpak => this%ibound(istart:iend)
     this%xnewpak => this%xnew(istart:iend)
-    call mem_checkin(this%xnewpak, 'HEAD', this%memoryPath, 'X',                 &
-                     this%memoryPathModel, MEMREADWRITE)
+    call mem_checkin(this%xnewpak, 'HEAD', this%memoryPath, 'X', this%memoryPathModel)
     call mem_allocate(this%xoldpak, this%nmawwells, 'XOLDPAK', this%memoryPath)
     !
     ! -- initialize xnewpak
